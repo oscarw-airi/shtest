@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>上海少女膠原節：實時成績</title>
+    
+    <!-- Load React, ReactDOM, Babel, and Tailwind via CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-[#f0f9f4]">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo, useCallback } = React;
+
+        // --- Inline SVG Icons ---
+        const Skyline = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 2v20"/><path d="M8 22v-4h8v4"/><path d="M10 18v-5a2 2 0 0 1 2-2v0a2 2 0 0 1 2 2v5"/><path d="M14 11V7a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v4"/><circle cx="12" cy="7" r="1"/></svg>;
+        const Search = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>;
+        const ChevronDown = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m6 9 6 6 6-6"/></svg>;
+        const ChevronUp = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m18 15-6-6-6 6"/></svg>;
+        const AlertCircle = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>;
+        const FilterIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>;
+        const TableIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" x2="21" y1="9" y2="9"/><line x1="3" x2="21" y1="15" y2="15"/><line x1="9" x2="9" y1="9" y2="21"/><line x1="15" x2="15" y1="9" y2="21"/></svg>;
+        const RefreshCw = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>;
+        const Download = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>;
+        
+        // Summary Card Icons
+        const Share2 = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" x2="15.42" y1="13.51" y2="17.49"/><line x1="15.41" x2="8.59" y1="6.51" y2="10.49"/></svg>;
+        const CalendarCheck = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/><path d="m9 16 2 2 4-4"/></svg>;
+        const TrendingUp = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>;
+        const Zap = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
+        const Gift = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 12 20 22 4 22 4 12"/><rect width="20" height="5" x="2" y="7"/><line x1="12" x2="12" y1="22" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>;
+        const UserIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+
+        function parseCSV(text) {
+            const result = [];
+            const lines = text.split(/\r?\n/);
+            for (let line of lines) {
+                const row = [];
+                let inQuotes = false;
+                let val = "";
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') inQuotes = !inQuotes;
+                    else if (char === ',' && !inQuotes) { row.push(val.trim()); val = ""; }
+                    else val += char;
+                }
+                row.push(val.trim());
+                result.push(row);
+            }
+            return result;
+        }
+
+        const parseNumber = (val) => {
+            if (!val || val === '-' || val === '#N/A' || val === 'no data atm' || val === '#DIV/0!') return 0;
+            const clean = String(val).replace(/,/g, '').replace(/%/g, '').replace(/\$/g, '').replace(/¥/g, '');
+            const num = parseFloat(clean);
+            return isNaN(num) ? 0 : num;
+        };
+
+        const formatShortCurrency = (val) => {
+            if (val === undefined || isNaN(val)) return '-';
+            const num = Math.abs(val);
+            if (num >= 1000000) return (val < 0 ? '-$' : '$') + (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (val < 0 ? '-$' : '$') + (num / 1000).toFixed(1) + 'K';
+            return (val < 0 ? '-$' : '$') + num.toLocaleString();
+        };
+
+        const formatShortCurrency2Decimals = (val) => {
+            if (val === undefined || isNaN(val)) return '-';
+            const num = Math.abs(val);
+            if (num >= 1000000) return (val < 0 ? '-$' : '$') + (num / 1000000).toFixed(2) + 'M';
+            if (num >= 1000) return (val < 0 ? '-$' : '$') + (num / 1000).toFixed(2) + 'K';
+            return (val < 0 ? '-$' : '$') + num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        };
+
+        const formatDateToYMD = (dateObj) => {
+            if (!dateObj) return '';
+            const y = dateObj.getFullYear();
+            const m = dateObj.getMonth() + 1;
+            const d = dateObj.getDate();
+            const timeStr = dateObj.toLocaleTimeString('zh-HK', { hour12: false });
+            return `${y}年${m}月${d}日 ${timeStr}`;
+        };
+
+        const getConditionalFormat = (colName, val, targetRatio, ranges) => {
+            const num = parseFloat(val);
+            if (isNaN(num)) return { className: 'text-gray-800' };
+
+            let className = 'text-gray-900 font-medium ';
+            let style = {};
+
+            if (colName === '分發點總數') {
+                if (num > 200) className += 'bg-green-200';
+                else if (num >= 150) className += 'bg-yellow-200';
+                else if (num >= 80) className += 'bg-orange-200';
+                else className += 'bg-red-200';
+            }
+            else if (colName === '3天增加' || colName === '生日 Giftcard 三天增加' || colName === 'Plasma Giftcard 三天增加') {
+                if (num > 0) className += 'bg-green-200';
+                else if (num < 0) className += 'bg-red-200';
+            }
+            else if (colName === '未來 ICB Booking' || colName === '昨天SHOW' || colName === '昨天SHOW (ICB)') {
+                if (num > 25) className += 'bg-green-200';
+                else if (num >= 15) className += 'bg-yellow-200';
+                else className += 'bg-red-200';
+            }
+            else if (colName === '體驗療程開單(今天)' || colName === '今天 PT QTY' || colName === '套餐 (Package)開單(今天)' || colName === '今天 Full course' || colName === '生日 Giftcard Book' || colName === 'Plasma Giftcard Book') {
+                if (num >= 3) className += 'bg-green-200';
+                else if (num >= 1) className += 'bg-yellow-200';
+                else className += 'bg-red-200';
+            }
+            else if (colName === 'MTD%') {
+                if (targetRatio && num > (targetRatio * 100)) className += 'bg-purple-300 font-bold';
+                else if (num >= 100) className += 'bg-green-200';
+                else if (num >= 90) className += 'bg-yellow-200';
+                else className += 'bg-red-200';
+            }
+            else if (['今天 Full course', '體驗療程開單 (今天)', 'MAU %', '滲透率%'].includes(colName)) {
+                // Color Gradient (Low to High = Red to Green)
+                const range = ranges[colName];
+                if (range && range.max > range.min) {
+                    const ratio = (num - range.min) / (range.max - range.min);
+                    const hue = ratio * 120; // 0 is Red, 120 is Green
+                    style.backgroundColor = `hsl(${hue}, 80%, 85%)`;
+                } else if (range && range.max === range.min && range.max > 0) {
+                    style.backgroundColor = `hsl(120, 80%, 85%)`; 
+                }
+            }
+
+            return { className, style };
+        };
+
+        function getDynamicIndex(headers, searchTerms, fallbackIndex) {
+            for (let i = 0; i < headers.length; i++) {
+                const h = (headers[i] || '').replace(/[\r\n]+/g, ' ').replace(/"/g, '').trim().toLowerCase();
+                if (searchTerms.some(term => h === term.toLowerCase())) {
+                    return i;
+                }
+            }
+            for (let i = 0; i < headers.length; i++) {
+                const h = (headers[i] || '').replace(/[\r\n]+/g, ' ').replace(/"/g, '').trim().toLowerCase();
+                if (searchTerms.some(term => h.includes(term.toLowerCase()))) {
+                    return i;
+                }
+            }
+            return fallbackIndex;
+        }
+
+        const GOOGLE_SHEET_ID = '1mtORjZ4a5EyrlPJsiejhXuMZiyw5MStoXdxn5l1Jhno';
+
+        function App() {
+            const [data, setData] = useState([]);
+            const [headers, setHeaders] = useState([]);
+            const [colMap, setColMap] = useState(null); 
+            const [loading, setLoading] = useState(true);
+            const [error, setError] = useState(null);
+
+            const [grandTotalRow, setGrandTotalRow] = useState(null);
+            const [mtdTargetRatio, setMtdTargetRatio] = useState(null);
+
+            const [searchTerm, setSearchTerm] = useState('');
+            const [selectedBrand, setSelectedBrand] = useState('All');
+            const [selectedCenter, setSelectedCenter] = useState('All');
+            const [selectedTherapist, setSelectedTherapist] = useState('All');
+            const [selectedBS, setSelectedBS] = useState('All');
+            const [lastSyncTime, setLastSyncTime] = useState(null);
+            
+            const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
+
+            const fetchData = useCallback(async () => {
+                try {
+                    setLoading(true);
+                    const sheetId = GOOGLE_SHEET_ID;
+                    
+                    // ==========================================
+                    // 💡 UPDATE: Changed Data Range to A:AG
+                    // ==========================================
+                    const urls = [
+                        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('(WEB) real time (SH)')}&range=A:AG`
+                    ];
+
+                    const [realTimeRes] = await Promise.all(
+                        urls.map(url => fetch(url))
+                    );
+
+                    if (!realTimeRes.ok) throw new Error("Could not fetch the sheet. Please ensure it's set to 'Anyone with the link can view'.");
+                    
+                    const realTimeCsv = await realTimeRes.text();
+                    
+                    // Added Try-Catch specifically around parsing to prevent silent failures on bad data
+                    let realTimeParsed;
+                    try {
+                        realTimeParsed = parseCSV(realTimeCsv);
+                    } catch(parseErr) {
+                        throw new Error("Failed to parse CSV data. The sheet format may have changed.");
+                    }
+
+                    // Find Grand Total row
+                    const gtRow = realTimeParsed.find(row => row[2] === 'Grand Total');
+                    if (gtRow) setGrandTotalRow(gtRow);
+
+                    let targetRatio = null;
+                    if (realTimeParsed.length > 2) {
+                        // 💡 UPDATE: Safe Check for indices outside of the A:AG range (Index 61 & 64)
+                        const bj3 = realTimeParsed[2][61] !== undefined ? parseNumber(realTimeParsed[2][61]) : 0;
+                        const bm2 = realTimeParsed[1][64] !== undefined ? parseNumber(realTimeParsed[1][64]) : 0;
+                        if (bm2 > 0) {
+                            targetRatio = (bj3 / bm2) * 1.5;
+                        }
+                    }
+                    setMtdTargetRatio(targetRatio);
+
+                    // --- EXTRACT HEADER INDICES DYNAMICALLY ---
+                    let headerRowIdx = 0;
+                    for (let i = 0; i < Math.min(10, realTimeParsed.length); i++) {
+                        if (realTimeParsed[i].some(cell => cell.toLowerCase().includes('brand') || cell.toLowerCase().includes('center'))) {
+                            headerRowIdx = i;
+                            break;
+                        }
+                    }
+
+                    const extractedHeaders = realTimeParsed[headerRowIdx];
+                    
+                    const mappedIndices = {
+                        brand: getDynamicIndex(extractedHeaders, ['Brand'], 0),
+                        center: getDynamicIndex(extractedHeaders, ['Center'], 2),
+                        therapist: getDynamicIndex(extractedHeaders, ['Therapist'], 3),
+                        bs: getDynamicIndex(extractedHeaders, ['BS'], 4),
+                        
+                        // CB 區域對應 F, G
+                        cb1: getDynamicIndex(extractedHeaders, ['ACB', 'acb', 'CB1'], 5), 
+                        cb2: getDynamicIndex(extractedHeaders, ['ICB', 'icb', 'CB2'], 6), 
+                        
+                        // 200% Purple Light 對應 H 到 L
+                        targetMonth: getDynamicIndex(extractedHeaders, ['本月目標$$'], 7),
+                        totalSalesMonth: getDynamicIndex(extractedHeaders, ['本月總業績$$'], 8),
+                        mtdPercent: getDynamicIndex(extractedHeaders, ['MTD%'], 9),
+                        turnLightMissing: getDynamicIndex(extractedHeaders, ['轉燈尚欠$$'], 10),
+                        todaySales: getDynamicIndex(extractedHeaders, ['今日開單 $$', '今日開單$$'], 11),
+
+                        futureICB: getDynamicIndex(extractedHeaders, ['未來 ICB Booking'], 14), 
+                        yesterdayShow: getDynamicIndex(extractedHeaders, ['昨天SHOW'], 12), 
+                        yesterdayShowICB: getDynamicIndex(extractedHeaders, ['昨天SHOW (ICB)', '昨天SHOW(ICB)'], 13), 
+                        
+                        node: getDynamicIndex(extractedHeaders, ['Node總數'], 15), 
+                        mauPercent: getDynamicIndex(extractedHeaders, ['MAU %', 'MAU%'], 16), 
+                        node3Days: getDynamicIndex(extractedHeaders, ['3天增加'], 17), 
+                        
+                        trialTodayMain: getDynamicIndex(extractedHeaders, ['體驗療程開單 (今天)', '體驗療程開單(今天)'], 18),
+                        trialTodayBracket: getDynamicIndex(extractedHeaders, ['今天 PT QTY', '今天PT QTY'], 19),
+                        packageTodayMain: getDynamicIndex(extractedHeaders, ['套餐 (Package)開單(今天)', '套餐(Package)開單(今天)'], 20),
+                        packageTodayBracket: getDynamicIndex(extractedHeaders, ['今天 Full course', '今天Full course'], 21),
+                        penetrationRate: getDynamicIndex(extractedHeaders, ['滲透率%'], 22),
+                        
+                        bdayBook: getDynamicIndex(extractedHeaders, ['生日 Giftcard Book', '生日Giftcard Book'], 23),
+                        bdayDelta: getDynamicIndex(extractedHeaders, ['生日 Giftcard 三天增加', '生日Giftcard三天增加'], 24),
+                        plasmaBook: getDynamicIndex(extractedHeaders, ['Plasma Giftcard Book', 'PlasmaGiftcard Book'], 25),
+                        plasmaDelta: getDynamicIndex(extractedHeaders, ['Plasma Giftcard 三天增加', 'PlasmaGiftcard三天增加'], 26),
+
+                        // 直播激活 對應 source col AB - AG (Indices 27 to 32)
+                        liveAB: getDynamicIndex(extractedHeaders, ['RSVP(ACB)', 'rsvp(acb)', 'RSVP (ACB)', 'RSVP', 'rsvp'], 27), 
+                        liveAC: getDynamicIndex(extractedHeaders, ['RSVP(ICB)', 'rsvp(icb)', 'RSVP (ICB)', 'Book', 'book'], 28), 
+                        liveAD: getDynamicIndex(extractedHeaders, ['Book(ACB)', 'book(acb)', 'Book (ACB)', 'Show', 'show'], 29), 
+                        liveAE: getDynamicIndex(extractedHeaders, ['Book(ICB)', 'book(icb)', 'Book (ICB)', 'Sign', 'sign'], 30),
+                        liveAF: getDynamicIndex(extractedHeaders, ['Show', 'show', 'Live AF', 'af'], 31),
+                        liveAG: getDynamicIndex(extractedHeaders, ['Sign', 'sign', 'Live AG', 'ag'], 32)
+                    };
+                    setColMap(mappedIndices);
+
+                    const rawData = realTimeParsed.slice(headerRowIdx + 1, 300).filter(row => row.length > 5); 
+                    
+                    let currentBrand = 'Unknown';
+                    let currentCenter = 'Unknown';
+                    
+                    const filledData = rawData.map(row => {
+                        if (row[mappedIndices.brand] && row[mappedIndices.brand].trim() !== '') currentBrand = row[mappedIndices.brand];
+                        else row[mappedIndices.brand] = currentBrand;
+                        
+                        if (row[mappedIndices.center] && row[mappedIndices.center].trim() !== '') currentCenter = row[mappedIndices.center];
+                        else row[mappedIndices.center] = currentCenter;
+                        
+                        return row;
+                    });
+
+                    const finalHeaders = extractedHeaders.map((h, i) => h || `Col ${i + 1}`);
+
+                    setHeaders(finalHeaders);
+                    setData(filledData);
+                    setLastSyncTime(new Date());
+                    setError(null);
+
+                } catch (err) {
+                    setError(err.message);
+                    setLastSyncTime(new Date());
+                } finally {
+                    setLoading(false);
+                }
+            }, []);
+
+            // AUTO-REFRESH Implementation (Every 5 minutes)
+            useEffect(() => {
+                fetchData();
+                const intervalId = setInterval(fetchData, 5 * 60 * 1000); // 300,000 ms
+                return () => clearInterval(intervalId); // Cleanup on unmount
+            }, [fetchData]);
+
+            // Constructing Active KPI Table Definitions Dynamically
+            const activeKPIs = useMemo(() => {
+                if (!colMap) return [];
+                
+                return [
+                    // CB Group
+                    { id: 'cb1', index: colMap.cb1, name: 'ACB', format: 'number', headerClass: 'bg-cyan-100 text-cyan-900 border-t border-cyan-200' },
+                    { id: 'cb2', index: colMap.cb2, name: 'ICB', format: 'number', headerClass: 'bg-cyan-100 text-cyan-900 border-t border-cyan-200' },
+
+                    // 200% Purple Light Group
+                    { id: 'targetMonth', index: colMap.targetMonth, name: '本月目標$$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
+                    { id: 'totalSalesMonth', index: colMap.totalSalesMonth, name: '本月總業績$$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
+                    { id: 'mtdPercent', index: colMap.mtdPercent, name: 'MTD%', format: 'percent', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
+                    { id: 'turnLightMissing', index: colMap.turnLightMissing, name: '轉燈尚欠$$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
+                    { id: 'todaySales', index: colMap.todaySales, name: '今日開單 $$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
+
+                    // 862+ICB Group
+                    { id: 'futureICB', index: colMap.futureICB, name: '未來 ICB Booking', format: 'number', headerClass: 'bg-orange-100 text-orange-900 border-t border-orange-200' },
+                    { id: 'yesterdayShow', index: colMap.yesterdayShow, name: '昨天SHOW', format: 'number', headerClass: 'bg-orange-100 text-orange-900 border-t border-orange-200' },
+                    { id: 'yesterdayShowICB', index: colMap.yesterdayShowICB, name: '昨天SHOW (ICB)', format: 'number', headerClass: 'bg-orange-100 text-orange-900 border-t border-orange-200' },
+
+                    // 200 Nodes Group
+                    { id: 'node', index: colMap.node, name: '分發點總數', format: 'number', headerClass: 'bg-blue-100 text-blue-900 border-t border-blue-200' },
+                    { id: 'mauPercent', index: colMap.mauPercent, name: 'MAU %', format: 'percent', headerClass: 'bg-blue-100 text-blue-900 border-t border-blue-200' },
+                    { id: 'node3Days', index: colMap.node3Days, name: '3天增加', format: 'number', headerClass: 'bg-blue-100 text-blue-900 border-t border-blue-200' },
+                    
+                    // High Pexo PT/Head Group
+                    { id: 'trialTodayMain', index: colMap.trialTodayMain, name: '體驗療程開單(今天)', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
+                    { id: 'trialTodayBracket', index: colMap.trialTodayBracket, name: '今天 PT QTY', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
+                    { id: 'packageTodayMain', index: colMap.packageTodayMain, name: '套餐 (Package)開單(今天)', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
+                    { id: 'packageTodayBracket', index: colMap.packageTodayBracket, name: '今天 Full course', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
+                    { id: 'penetrationRate', index: colMap.penetrationRate, name: '滲透率%', format: 'percent', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
+                    
+                    // 龍尾 (Dragon Tail) Group
+                    { id: 'bdayBook', index: colMap.bdayBook, name: '生日 Giftcard Book', format: 'number', headerClass: 'bg-yellow-100 text-yellow-900 border-t border-yellow-200' },
+                    { id: 'bdayDelta', index: colMap.bdayDelta, name: '生日 Giftcard 三天增加', format: 'number', headerClass: 'bg-yellow-100 text-yellow-900 border-t border-yellow-200' },
+                    { id: 'plasmaBook', index: colMap.plasmaBook, name: 'Plasma Giftcard Book', format: 'number', headerClass: 'bg-yellow-100 text-yellow-900 border-t border-yellow-200' },
+                    { id: 'plasmaDelta', index: colMap.plasmaDelta, name: 'Plasma Giftcard 三天增加', format: 'number', headerClass: 'bg-yellow-100 text-yellow-900 border-t border-yellow-200' },
+
+                    // 直播激活 (Grape purple) Group
+                    { id: 'liveAB', index: colMap.liveAB, name: 'RSVP(ACB)', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' },
+                    { id: 'liveAC', index: colMap.liveAC, name: 'RSVP(ICB)', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' },
+                    { id: 'liveAD', index: colMap.liveAD, name: 'Book(ACB)', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' },
+                    { id: 'liveAE', index: colMap.liveAE, name: 'Book(ICB)', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' },
+                    { id: 'liveAF', index: colMap.liveAF, name: 'Show', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' },
+                    { id: 'liveAG', index: colMap.liveAG, name: 'Sign', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' }
+                ].map(kpi => ({
+                    ...kpi,
+                    displayName: (headers[kpi.index] && headers[kpi.index].trim() !== '') ? headers[kpi.index].replace(/[\r\n]+/g, ' ').replace(/"/g, '') : kpi.name
+                }));
+            }, [colMap, headers]);
+
+            const brands = useMemo(() => {
+                if (!colMap) return [];
+                const validRows = data.filter(r => r[colMap.center] !== 'Grand Total');
+                return ['All', ...new Set(validRows.map(r => r[colMap.brand]).filter(Boolean))];
+            }, [data, colMap]);
+
+            const centers = useMemo(() => {
+                if (!colMap) return [];
+                const validRows = data.filter(r => r[colMap.center] !== 'Grand Total');
+                const brandFiltered = selectedBrand === 'All' ? validRows : validRows.filter(r => r[colMap.brand] === selectedBrand);
+                return ['All', ...new Set(brandFiltered.map(r => r[colMap.center]).filter(Boolean))];
+            }, [data, selectedBrand, colMap]);
+
+            const therapists = useMemo(() => {
+                if (!colMap) return [];
+                const validRows = data.filter(r => r[colMap.center] !== 'Grand Total');
+                let brandFiltered = selectedBrand === 'All' ? validRows : validRows.filter(r => r[colMap.brand] === selectedBrand);
+                let centerFiltered = selectedCenter === 'All' ? brandFiltered : brandFiltered.filter(r => r[colMap.center] === selectedCenter);
+                return ['All', ...new Set(centerFiltered.map(r => r[colMap.therapist]).filter(Boolean))];
+            }, [data, selectedBrand, selectedCenter, colMap]);
+
+            const bsList = useMemo(() => {
+                if (!colMap) return [];
+                const validRows = data.filter(r => r[colMap.center] !== 'Grand Total');
+                let brandFiltered = selectedBrand === 'All' ? validRows : validRows.filter(r => r[colMap.brand] === selectedBrand);
+                let centerFiltered = selectedCenter === 'All' ? brandFiltered : brandFiltered.filter(r => r[colMap.center] === selectedCenter);
+                let therapistFiltered = selectedTherapist === 'All' ? centerFiltered : centerFiltered.filter(r => r[colMap.therapist] === selectedTherapist);
+                return ['All', ...new Set(therapistFiltered.map(r => r[colMap.bs]).filter(Boolean))];
+            }, [data, selectedBrand, selectedCenter, selectedTherapist, colMap]);
+
+            // PERFORMANCE FIX: Single Pass Filter & Map
+            const processedData = useMemo(() => {
+                if (!colMap || activeKPIs.length === 0) return [];
+                
+                const lowerSearch = searchTerm.toLowerCase();
+                let result = [];
+
+                for (let idx = 0; idx < data.length; idx++) {
+                    const row = data[idx];
+                    if (row[colMap.center] === 'Grand Total') continue;
+                    if (selectedBrand !== 'All' && row[colMap.brand] !== selectedBrand) continue;
+                    if (selectedCenter !== 'All' && row[colMap.center] !== selectedCenter) continue;
+                    if (selectedTherapist !== 'All' && row[colMap.therapist] !== selectedTherapist) continue;
+                    if (selectedBS !== 'All' && row[colMap.bs] !== selectedBS) continue;
+                    if (searchTerm && !row.join(' ').toLowerCase().includes(lowerSearch)) continue;
+
+                    let mapped = {
+                        id: `row-${idx}`, 
+                        Brand: row[colMap.brand] || 'Unknown', 
+                        Center: row[colMap.center] || 'Unknown',
+                        Therapist: row[colMap.therapist] || '', 
+                        BS: row[colMap.bs] || '',
+                        raw: row
+                    };
+                    
+                    for (const kpi of activeKPIs) {
+                        mapped[kpi.id] = parseNumber(row[kpi.index]);
+                    }
+                    result.push(mapped);
+                }
+
+                if (sortConfig.key) {
+                    result.sort((a, b) => {
+                        const valA = a[sortConfig.key];
+                        const valB = b[sortConfig.key];
+                        if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+                        if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+                        return 0;
+                    });
+                }
+                return result;
+            }, [data, searchTerm, selectedBrand, selectedCenter, selectedTherapist, sortConfig, activeKPIs, colMap]);
+
+            const colRanges = useMemo(() => {
+                const ranges = {};
+                if (!activeKPIs) return ranges;
+                
+                ['今天 Full course', '體驗療程開單 (今天)', 'MAU %', '滲透率%'].forEach(colName => {
+                    const kpi = activeKPIs.find(c => c.name === colName);
+                    if (kpi) {
+                        const vals = processedData.map(r => r[kpi.id]).filter(v => typeof v === 'number' && !isNaN(v));
+                        ranges[colName] = {
+                            min: vals.length ? Math.min(...vals) : 0,
+                            max: vals.length ? Math.max(...vals) : 100
+                        };
+                    }
+                });
+                return ranges;
+            }, [processedData, activeKPIs]);
+
+            const summaryData = useMemo(() => {
+                const isFiltered = selectedBrand !== 'All' || selectedCenter !== 'All' || selectedTherapist !== 'All' || selectedBS !== 'All' || searchTerm !== '';
+                
+                let sums = {
+                    totalNodes: 0, nodeDelta: 0, mauPercent: 0,
+                    futureICB: 0, yesterdayShow: 0, yesterdayShowICB: 0,
+                    trialTodayMain: 0, trialTodayBracket: 0, packageTodayMain: 0, packageTodayBracket: 0,
+                    penetrationRate: 0, targetMonth: 0, totalSalesMonth: 0, mtdPercent: 0, turnLightMissing: 0, todaySales: 0,
+                    bdayBook: 0, bdayDelta: 0, plasmaBook: 0, plasmaDelta: 0
+                };
+
+                if (!colMap) return sums;
+
+                if (!isFiltered && grandTotalRow) {
+                    sums.totalNodes = parseNumber(grandTotalRow[colMap.node]);
+                    sums.nodeDelta = parseNumber(grandTotalRow[colMap.node3Days]);
+                    sums.mauPercent = parseNumber(grandTotalRow[colMap.mauPercent]);
+                    
+                    sums.futureICB = parseNumber(grandTotalRow[colMap.futureICB]);
+                    sums.yesterdayShow = parseNumber(grandTotalRow[colMap.yesterdayShow]);
+                    sums.yesterdayShowICB = parseNumber(grandTotalRow[colMap.yesterdayShowICB]);
+                    
+                    sums.trialTodayMain = parseNumber(grandTotalRow[colMap.trialTodayMain]);        
+                    sums.trialTodayBracket = parseNumber(grandTotalRow[colMap.trialTodayBracket]);   
+                    sums.packageTodayMain = parseNumber(grandTotalRow[colMap.packageTodayMain]);
+                    sums.packageTodayBracket = parseNumber(grandTotalRow[colMap.packageTodayBracket]); 
+                    sums.penetrationRate = parseNumber(grandTotalRow[colMap.penetrationRate]);    
+                    
+                    sums.targetMonth = parseNumber(grandTotalRow[colMap.targetMonth]);
+                    sums.totalSalesMonth = parseNumber(grandTotalRow[colMap.totalSalesMonth]);
+                    sums.mtdPercent = parseNumber(grandTotalRow[colMap.mtdPercent]);    
+                    sums.turnLightMissing = parseNumber(grandTotalRow[colMap.turnLightMissing]);
+                    sums.todaySales = parseNumber(grandTotalRow[colMap.todaySales]);         
+
+                    sums.bdayBook = parseNumber(grandTotalRow[colMap.bdayBook]);
+                    sums.bdayDelta = parseNumber(grandTotalRow[colMap.bdayDelta]);
+                    sums.plasmaBook = parseNumber(grandTotalRow[colMap.plasmaBook]);
+                    sums.plasmaDelta = parseNumber(grandTotalRow[colMap.plasmaDelta]);
+                } else {
+                    processedData.forEach(item => {
+                        sums.totalNodes += item.node;
+                        sums.nodeDelta += item.node3Days;
+                        sums.mauPercent += item.mauPercent;
+                        
+                        sums.futureICB += item.futureICB;
+                        sums.yesterdayShow += item.yesterdayShow; 
+                        sums.yesterdayShowICB += item.yesterdayShowICB;
+                        
+                        sums.trialTodayMain += item.trialTodayMain;
+                        sums.trialTodayBracket += item.trialTodayBracket;
+                        
+                        sums.packageTodayMain += item.packageTodayMain;
+                        sums.packageTodayBracket += item.packageTodayBracket; 
+                        
+                        sums.penetrationRate += item.penetrationRate;
+                        
+                        sums.targetMonth += item.targetMonth;
+                        sums.totalSalesMonth += item.totalSalesMonth;
+                        sums.mtdPercent += item.mtdPercent;
+                        sums.turnLightMissing += item.turnLightMissing;
+                        sums.todaySales += item.todaySales;
+
+                        sums.bdayBook += item.bdayBook;
+                        sums.bdayDelta += item.bdayDelta;
+                        sums.plasmaBook += item.plasmaBook;
+                        sums.plasmaDelta += item.plasmaDelta;
+                    });
+                    
+                    if (processedData.length > 0) {
+                        sums.mtdPercent = sums.mtdPercent / processedData.length;
+                        sums.penetrationRate = sums.penetrationRate / processedData.length; 
+                        sums.mauPercent = sums.mauPercent / processedData.length; 
+                    }
+                }
+
+                return sums;
+            }, [selectedBrand, selectedCenter, selectedTherapist, searchTerm, processedData, grandTotalRow, colMap]);
+
+            const requestSort = (key) => {
+                let direction = 'asc';
+                if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+                setSortConfig({ key, direction });
+            };
+
+            const formatDisplayValue = (val, format) => {
+                if (val === undefined || isNaN(val)) return '-';
+                if (format === 'percent') return `${val.toFixed(2)}%`;
+                if (format === 'currency') return `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                return Number.isInteger(val) ? val.toLocaleString() : val.toFixed(2).replace(/\.00$/, '');
+            };
+
+            const exportToCSV = () => {
+                const csvHeaders = ['品牌', '樓層', '治療師', 'BS', ...activeKPIs.map(kpi => kpi.displayName)];
+                
+                const csvRows = processedData.map(row => {
+                    const rowData = [
+                        row.Brand,
+                        row.Center,
+                        row.Therapist,
+                        row.BS,
+                        ...activeKPIs.map(kpi => formatDisplayValue(row[kpi.id], kpi.format))
+                    ];
+                    return rowData.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',');
+                });
+
+                const csvContent = [
+                    csvHeaders.map(h => `"${String(h).replace(/"/g, '""')}"`).join(','), 
+                    ...csvRows
+                ].join('\n');
+                
+                const blob = new Blob(["\ufeff", csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.setAttribute("href", url);
+                link.setAttribute("download", `SH_Collagen_Festival_Data_${new Date().toISOString().slice(0,10)}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
+
+            if (loading && data.length === 0) return (
+                <div className="flex h-screen w-full items-center justify-center bg-[#f0f9f4]">
+                    <div className="flex flex-col items-center gap-4">
+                        <div className="h-12 w-12 animate-spin rounded-full border-4 border-green-500 border-t-transparent"></div>
+                        <p className="text-gray-600 font-medium">正在載入實時數據...</p>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div className="min-h-screen bg-[#f0f9f4] p-2 sm:p-4 lg:px-6 xl:px-8 font-sans text-gray-800">
+                
+                {/* Header & Controls */}
+                <div className="mb-6 flex flex-col gap-4 bg-white p-5 rounded-xl shadow-sm border border-green-100">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center w-full gap-4">
+                        <h1 className="text-3xl font-extrabold flex items-center gap-3 text-black">
+                            <Skyline className="text-emerald-600 w-8 h-8 flex-shrink-0" /> 
+                            <span className="drop-shadow-sm text-emerald-900">上海少女膠原節：實時成績</span>
+                        </h1>
+                        <div className="flex items-center gap-3 text-sm text-gray-600">
+                            {lastSyncTime && <span className="font-medium">最後更新：{formatDateToYMD(lastSyncTime)}</span>}
+                            <button 
+                                onClick={fetchData} 
+                                disabled={loading} 
+                                className="flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-700 font-semibold rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50 border border-green-200"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                                {loading ? '同步中...' : '重新同步'}
+                            </button>
+                        </div>
+                    </div>
+                    
+                    {/* Filters */}
+                    <div className="flex flex-col sm:flex-row gap-3 w-full items-center pt-3 border-t border-gray-100">
+                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+                            <FilterIcon className="w-4 h-4" /> 篩選：
+                        </div>
+                        <select 
+                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-sm min-w-[140px]"
+                            value={selectedBrand} 
+                            onChange={(e) => { setSelectedBrand(e.target.value); setSelectedCenter('All'); setSelectedTherapist('All'); setSelectedBS('All'); }}
+                        >
+                            {brands.map(b => (
+                                <option key={b} value={b}>{b === 'All' ? '所有品牌' : b}</option>
+                            ))}
+                        </select>
+                        <select 
+                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-sm min-w-[140px]"
+                            value={selectedCenter} 
+                            onChange={(e) => { setSelectedCenter(e.target.value); setSelectedTherapist('All'); setSelectedBS('All'); }}
+                        >
+                            {centers.map(c => (
+                                <option key={c} value={c}>{c === 'All' ? '所有樓層' : c}</option>
+                            ))}
+                        </select>
+                        <select 
+                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-sm min-w-[140px]"
+                            value={selectedTherapist} 
+                            onChange={(e) => { setSelectedTherapist(e.target.value); setSelectedBS('All'); }}
+                        >
+                            {therapists.map(t => (
+                                <option key={t} value={t}>{t === 'All' ? '所有治療師' : t}</option>
+                            ))}
+                        </select>
+                        <select 
+                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-sm min-w-[140px]"
+                            value={selectedBS} 
+                            onChange={(e) => setSelectedBS(e.target.value)}
+                        >
+                            {bsList.map(b => (
+                                <option key={b} value={b}>{b === 'All' ? '所有 BS' : b}</option>
+                            ))}
+                        </select>
+                        <div className="relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <input
+                                type="text" placeholder="搜尋資料..."
+                                className="pl-9 pr-4 py-2 bg-white shadow-sm border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
+                                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {error && (
+                    <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-start gap-3">
+                        <AlertCircle className="shrink-0 w-5 h-5 mt-0.5" />
+                        <div>
+                            <h3 className="font-semibold">無法獲取實時報表數據</h3>
+                            <p className="text-sm mt-1">{error}</p>
+                            <p className="text-sm mt-1 font-medium">目前顯示備用視覺結構。</p>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- DYNAMIC THERAPIST HEADER (Shows only when therapist is selected) --- */}
+                {(selectedTherapist !== 'All' || selectedBS !== 'All') && (
+                    <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
+                        <div className="bg-white px-5 py-2.5 rounded-full shadow-sm border border-green-200 flex items-center gap-2">
+                            <span className="text-gray-500 text-sm font-bold">樓層：</span>
+                            <span className="font-bold text-gray-800">{processedData.length > 0 ? processedData[0].Center : (selectedCenter !== 'All' ? selectedCenter : '-')}</span>
+                        </div>
+                        {selectedTherapist !== 'All' && (
+                            <div className="bg-green-600 px-5 py-2.5 rounded-full shadow-md border border-green-700 flex items-center gap-2 text-white">
+                                <UserIcon className="w-4 h-4 text-green-100" />
+                                <span className="text-green-100 text-sm font-bold">治療師：</span>
+                                <span className="font-extrabold">{selectedTherapist}</span>
+                            </div>
+                        )}
+                        {selectedBS !== 'All' && (
+                            <div className="bg-blue-600 px-5 py-2.5 rounded-full shadow-md border border-blue-700 flex items-center gap-2 text-white">
+                                <UserIcon className="w-4 h-4 text-blue-100" />
+                                <span className="text-blue-100 text-sm font-bold">BS：</span>
+                                <span className="font-extrabold">{selectedBS}</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* --- SUMMARY PANEL --- */}
+                <div className="flex flex-wrap justify-center items-stretch gap-4 mb-10">
+                    
+                    {/* 1st Section (Purple Box) - 200% 紫燈 */}
+                    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.667rem)] xl:w-[calc(20%-0.8rem)] bg-purple-600 rounded-xl p-3 flex flex-col shadow-lg h-full transition-transform hover:-translate-y-1">
+                        <h3 className="flex items-center justify-center gap-1.5 font-bold text-lg mb-2 border-b border-purple-400 pb-1 tracking-wide text-white">
+                            <Zap className="w-5 h-5 text-purple-200" />
+                            200% 紫燈
+                        </h3>
+                        
+                        <div className="flex flex-col justify-between h-full gap-2">
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="flex flex-col items-center bg-white/70 rounded-lg py-3 justify-center shadow-sm">
+                                    <div className="text-2xl font-extrabold text-gray-800">
+                                        {selectedTherapist === 'All' ? '無此數' : `${summaryData.mtdPercent.toFixed(2)}%`}
+                                    </div>
+                                    <span className="text-[10px] text-gray-700 mt-1 font-bold uppercase tracking-wider">Today MTD%</span>
+                                </div>
+                                
+                                <div className="flex flex-col items-center bg-white/70 rounded-lg py-3 justify-center shadow-sm">
+                                    <div className="text-2xl font-extrabold text-gray-800">{formatShortCurrency(summaryData.todaySales)}</div>
+                                    <span className="text-[10px] text-gray-700 mt-1 font-bold uppercase tracking-wider">今日銷售額</span>
+                                </div>
+                            </div>
+                            
+                            <div className="grid grid-cols-3 gap-1 mt-auto">
+                                <div className="bg-white/70 border border-white/50 rounded-lg p-1.5 flex flex-col justify-center items-center text-center shadow-inner">
+                                    <span className="text-sm font-extrabold text-gray-800">{formatShortCurrency(summaryData.turnLightMissing)}</span>
+                                    <span className="text-[9px] text-gray-700 font-bold uppercase leading-tight mt-1">轉燈尚欠$$</span>
+                                </div>
+                                <div className="bg-white/70 border border-white/50 rounded-lg p-1.5 flex flex-col justify-center items-center text-center shadow-inner">
+                                    <span className="text-sm font-extrabold text-gray-800">{formatShortCurrency2Decimals(summaryData.totalSalesMonth)}</span>
+                                    <span className="text-[9px] text-gray-700 font-bold uppercase leading-tight mt-1">本月總業績$$</span>
+                                </div>
+                                <div className="bg-white/70 border border-white/50 rounded-lg p-1.5 flex flex-col justify-center items-center text-center shadow-inner">
+                                    <span className="text-sm font-extrabold text-gray-800">{formatShortCurrency2Decimals(summaryData.targetMonth)}</span>
+                                    <span className="text-[9px] text-gray-700 font-bold uppercase leading-tight mt-1">本月目標$$</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 2nd Section (Orange Box) */}
+                    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.667rem)] xl:w-[calc(20%-0.8rem)] bg-orange-500 rounded-xl p-3 flex flex-col shadow-lg h-full transition-transform hover:-translate-y-1">
+                        <h3 className="flex items-center justify-center gap-1.5 font-bold text-lg mb-2 border-b border-orange-400 pb-1 tracking-wide text-white">
+                            <CalendarCheck className="w-5 h-5 text-orange-200" />
+                            862+ICB
+                        </h3>
+                        
+                        <div className="flex flex-col items-center bg-white/70 rounded-lg py-2 mb-2 shadow-sm">
+                            <span className="text-4xl font-extrabold text-gray-800">{summaryData.futureICB.toLocaleString()}</span>
+                            <span className="text-xs text-gray-700 mt-1 uppercase tracking-wider font-bold">未來 ICB Booking</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 mt-auto">
+                            <div className="bg-white/70 border border-white/50 rounded-lg p-2 flex flex-col justify-center items-center text-center shadow-inner">
+                                <span className="text-xl font-extrabold text-gray-800">{summaryData.yesterdayShow.toLocaleString()}</span>
+                                <span className="text-[10px] text-gray-700 font-bold uppercase leading-tight mt-1">昨天<br/>SHOW</span>
+                            </div>
+                            <div className="bg-white/70 border border-white/50 rounded-lg p-2 flex flex-col justify-center items-center text-center shadow-inner">
+                                <span className="text-xl font-extrabold text-gray-800">{summaryData.yesterdayShowICB.toLocaleString()}</span>
+                                <span className="text-[10px] text-gray-700 font-bold uppercase leading-tight mt-1">昨天SHOW<br/>(ICB)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3rd Section (Dark Blue Box) */}
+                    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.667rem)] xl:w-[calc(20%-0.8rem)] bg-blue-800 rounded-xl p-3 flex flex-col shadow-lg h-full transition-transform hover:-translate-y-1">
+                        <h3 className="flex items-center justify-center gap-1.5 font-bold text-lg mb-2 border-b border-blue-600 pb-1 tracking-wide text-white">
+                            <Share2 className="w-5 h-5 text-blue-200" />
+                            200分發點
+                        </h3>
+                        
+                        <div className="flex flex-col items-center bg-white/70 rounded-lg py-2 mb-2 shadow-sm">
+                            <span className="text-4xl font-extrabold text-gray-800">{summaryData.totalNodes.toLocaleString()}</span>
+                            <span className="text-xs text-gray-700 mt-1 uppercase tracking-wider font-bold">分發點總數</span>
+                        </div>
+                        
+                        <div className="flex justify-between items-stretch gap-2 mt-auto">
+                            <div className="bg-white/70 border border-white/50 rounded-lg p-2 flex-1 flex flex-col justify-center items-center text-center shadow-inner">
+                                <span className="text-xl font-extrabold text-gray-800">{summaryData.nodeDelta > 0 ? `+${summaryData.nodeDelta}` : summaryData.nodeDelta}</span>
+                                <span className="text-xs text-gray-700 font-bold uppercase mt-1 leading-tight">3天增加</span>
+                            </div>
+                            <div className="bg-white/70 border border-white/50 rounded-lg p-2 flex-1 flex flex-col justify-center items-center text-center shadow-inner">
+                                <span className="text-xl font-extrabold text-gray-800">
+                                    {selectedTherapist === 'All' ? '無此數' : `${summaryData.mauPercent.toFixed(2)}%`}
+                                </span>
+                                <span className="text-xs text-gray-700 font-bold uppercase mt-1 leading-tight">MAU %</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 4th Section (Green Box) - High PEXO */}
+                    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.667rem)] xl:w-[calc(20%-0.8rem)] bg-[#4caf50] rounded-xl p-3 flex flex-col shadow-lg h-full transition-transform hover:-translate-y-1">
+                        <h3 className="flex items-center justify-center gap-1.5 font-bold text-lg mb-2 border-b border-[#3d8c40] pb-1 tracking-wide text-white">
+                            <TrendingUp className="w-5 h-5 text-green-200" />
+                            High PEXO
+                        </h3>
+                        
+                        <div className="grid grid-cols-2 gap-2 mb-2">
+                            <div className="flex flex-col items-center bg-white/70 rounded-lg py-2 shadow-sm">
+                                <div className="text-3xl font-extrabold flex items-baseline text-gray-800">
+                                    {summaryData.trialTodayMain.toLocaleString()} 
+                                    <span className="text-base text-gray-600 ml-1 font-bold">({summaryData.trialTodayBracket})</span>
+                                </div>
+                                <span className="text-[10px] text-gray-700 mt-1 uppercase tracking-wider font-extrabold">體驗療程開單(今天)</span>
+                            </div>
+                            
+                            <div className="flex flex-col items-center bg-white/70 rounded-lg py-2 shadow-sm">
+                                <div className="text-3xl font-extrabold flex items-baseline text-gray-800">
+                                    {summaryData.packageTodayMain.toLocaleString()} 
+                                    <span className="text-base text-gray-600 ml-1 font-bold">({summaryData.packageTodayBracket})</span>
+                                </div>
+                                <span className="text-[10px] text-gray-700 mt-1 uppercase tracking-wider font-extrabold">套餐 (Package)開單(今天)</span>
+                            </div>
+                        </div>
+                        
+                        <div className="flex justify-center mt-auto">
+                            <div className="bg-white/70 border border-white/50 rounded-lg p-1.5 w-full flex flex-col justify-center items-center text-center shadow-inner">
+                                <span className="text-xl font-extrabold text-gray-800">
+                                    {selectedTherapist === 'All' ? '無此數' : `${summaryData.penetrationRate.toFixed(2)}%`}
+                                </span>
+                                <span className="text-[10px] text-gray-700 font-extrabold uppercase mt-1 leading-tight">滲透率%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 5th Section (Yellow Box) - 龍尾 */}
+                    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.667rem)] xl:w-[calc(20%-0.8rem)] bg-yellow-500 rounded-xl p-3 flex flex-col shadow-lg h-full transition-transform hover:-translate-y-1">
+                        <h3 className="flex items-center justify-center gap-1.5 font-bold text-lg mb-2 border-b border-yellow-600 pb-1 tracking-wide text-white">
+                            <Gift className="w-5 h-5 text-yellow-100" />
+                            龍尾
+                        </h3>
+                        
+                        <div className="grid grid-cols-2 gap-2 h-full">
+                            <div className="flex flex-col items-center bg-white/80 rounded-lg py-4 px-2 shadow-sm text-center justify-center">
+                                <div className="text-3xl font-extrabold flex items-baseline text-gray-800">
+                                    {summaryData.bdayBook.toLocaleString()} 
+                                    <span className="text-base text-gray-600 ml-1 font-bold">
+                                        ({summaryData.bdayDelta > 0 ? `+${summaryData.bdayDelta}` : summaryData.bdayDelta})
+                                    </span>
+                                </div>
+                                <span className="text-[10px] text-gray-700 mt-2 uppercase tracking-wider font-extrabold leading-tight">生日 Giftcard Book<br/>(三天增加)</span>
+                            </div>
+                            
+                            <div className="flex flex-col items-center bg-white/80 rounded-lg py-4 px-2 shadow-sm text-center justify-center">
+                                <div className="text-3xl font-extrabold flex items-baseline text-gray-800">
+                                    {summaryData.plasmaBook.toLocaleString()} 
+                                    <span className="text-base text-gray-600 ml-1 font-bold">
+                                        ({summaryData.plasmaDelta > 0 ? `+${summaryData.plasmaDelta}` : summaryData.plasmaDelta})
+                                    </span>
+                                </div>
+                                <span className="text-[10px] text-gray-700 mt-2 uppercase tracking-wider font-extrabold leading-tight">Plasma Giftcard Book<br/>(三天增加)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+
+                {/* --- TABLE SEPARATION AND TITLE --- */}
+                <div className="mt-10 mb-4">
+                    <hr className="border-t-2 border-gray-200 mb-6" />
+                    <div className="flex justify-between items-center px-2">
+                        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                            <TableIcon className="w-5 h-5 text-green-600" />
+                            詳細數據表
+                        </h2>
+                        <button 
+                            onClick={exportToCSV}
+                            className="flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-700 font-semibold rounded-lg hover:bg-green-100 transition-colors text-sm border border-green-200 shadow-sm"
+                        >
+                            <Download className="w-4 h-4" />
+                            匯出 CSV
+                        </button>
+                    </div>
+                </div>
+
+                {/* --- DATA TABLE --- */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="overflow-x-auto max-h-[75vh]">
+                        <table className="w-full text-sm text-left whitespace-nowrap border-collapse">
+                            <thead className="text-xs text-gray-700 bg-gray-50 sticky top-0 z-40 shadow-sm">
+                                {/* Multi-level Super Headers */}
+                                <tr>
+                                    <th className="bg-white border-b border-gray-200 border-r sticky left-0 z-40 min-w-[60px] max-w-[60px] w-[60px]"></th>
+                                    <th className="bg-white border-b border-gray-200 border-r sticky left-[60px] z-40 min-w-[90px] max-w-[90px] w-[90px]"></th>
+                                    <th className="bg-white border-b border-gray-200 border-r sticky left-[150px] z-40 min-w-[85px] max-w-[85px] w-[85px]"></th>
+                                    <th className="bg-white border-b border-gray-200 border-r sticky left-[235px] z-40 min-w-[85px] max-w-[85px] w-[85px] shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)]"></th>
+                                    
+                                    <th colSpan="2" className="bg-cyan-600 text-white text-center font-bold py-1.5 border-r border-cyan-700 text-[11px] tracking-wide">
+                                        CB
+                                    </th>
+
+                                    <th colSpan="5" className="bg-purple-600 text-white text-center font-bold py-1.5 border-r border-purple-700 text-[11px] tracking-wide">
+                                        200% Purple Light
+                                    </th>
+
+                                    <th colSpan="3" className="bg-orange-500 text-white text-center font-bold py-1.5 border-r border-orange-600 text-[11px] tracking-wide">
+                                        862+ICB
+                                    </th>
+                                    
+                                    <th colSpan="3" className="bg-blue-800 text-white text-center font-bold py-1.5 border-r border-blue-900 text-[11px] tracking-wide">
+                                        200 Nodes
+                                    </th>
+                                    
+                                    <th colSpan="5" className="bg-[#4caf50] text-white text-center font-bold py-1.5 border-r border-green-700 text-[11px] tracking-wide">
+                                        High Pexo PT/Head
+                                    </th>
+
+                                    <th colSpan="4" className="bg-yellow-600 text-white text-center font-bold py-1.5 border-r border-yellow-700 text-[11px] tracking-wide">
+                                        龍尾
+                                    </th>
+
+                                    <th colSpan="6" className="bg-fuchsia-700 text-white text-center font-bold py-1.5 text-[11px] tracking-wide">
+                                        直播激活
+                                    </th>
+                                </tr>
+                                
+                                {/* Sortable KPI Headers */}
+                                <tr>
+                                    {/* Sortable Main Hierarchy Headers (FROZEN/STICKY) */}
+                                    <th className={`px-1 py-1.5 font-bold hover:bg-gray-200 transition-colors border-b border-r border-gray-200 align-top min-w-[60px] max-w-[60px] w-[60px] sticky left-0 z-40 ${sortConfig.key === 'Brand' ? 'bg-gray-300 shadow-inner' : 'bg-gray-50'}`}>
+                                        <div className="flex items-center gap-0.5 cursor-pointer mb-1 text-[10px] justify-between" onClick={() => requestSort('Brand')}>
+                                            <span className="truncate">品牌</span>
+                                            {sortConfig.key === 'Brand' ? (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-black" /> : <ChevronDown className="w-4 h-4 flex-shrink-0 text-black" />) : <ChevronDown className="w-3 h-3 opacity-20 flex-shrink-0" />}
+                                        </div>
+                                        <select 
+                                            className="w-full text-[9px] font-normal border border-gray-300 rounded text-gray-700 bg-white py-0.5 px-0.5 focus:outline-none focus:ring-1 focus:ring-green-500 mt-0.5 shadow-sm"
+                                            value={selectedBrand}
+                                            onChange={(e) => { setSelectedBrand(e.target.value); setSelectedCenter('All'); setSelectedTherapist('All'); }}
+                                        >
+                                            {brands.map(b => <option key={b} value={b}>{b === 'All' ? '全部' : b}</option>)}
+                                        </select>
+                                    </th>
+                                    <th className={`px-1 py-1.5 font-bold hover:bg-gray-200 transition-colors border-b border-r border-gray-200 align-top min-w-[90px] max-w-[90px] w-[90px] sticky left-[60px] z-40 ${sortConfig.key === 'Center' ? 'bg-gray-300 shadow-inner' : 'bg-gray-50'}`}>
+                                        <div className="flex items-center gap-0.5 cursor-pointer mb-1 text-[10px] justify-between" onClick={() => requestSort('Center')}>
+                                            <span className="truncate">樓層</span>
+                                            {sortConfig.key === 'Center' ? (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-black" /> : <ChevronDown className="w-4 h-4 flex-shrink-0 text-black" />) : <ChevronDown className="w-3 h-3 opacity-20 flex-shrink-0" />}
+                                        </div>
+                                        <select 
+                                            className="w-full text-[9px] font-normal border border-gray-300 rounded text-gray-700 bg-white py-0.5 px-0.5 focus:outline-none focus:ring-1 focus:ring-green-500 mt-0.5 shadow-sm"
+                                            value={selectedCenter}
+                                            onChange={(e) => { setSelectedCenter(e.target.value); setSelectedTherapist('All'); setSelectedBS('All'); }}
+                                        >
+                                            {centers.map(c => <option key={c} value={c}>{c === 'All' ? '全部' : c}</option>)}
+                                        </select>
+                                    </th>
+                                    <th className={`px-1 py-1.5 font-bold hover:bg-gray-200 transition-colors border-b border-r border-gray-200 align-top min-w-[85px] max-w-[85px] w-[85px] sticky left-[150px] z-40 ${sortConfig.key === 'Therapist' ? 'bg-gray-300 shadow-inner' : 'bg-gray-50'}`}>
+                                        <div className="flex items-center gap-0.5 cursor-pointer mb-1 text-[10px] justify-between" onClick={() => requestSort('Therapist')}>
+                                            <span className="truncate">治療師</span>
+                                            {sortConfig.key === 'Therapist' ? (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-black" /> : <ChevronDown className="w-4 h-4 flex-shrink-0 text-black" />) : <ChevronDown className="w-3 h-3 opacity-20 flex-shrink-0" />}
+                                        </div>
+                                        <select 
+                                            className="w-full text-[9px] font-normal border border-gray-300 rounded text-gray-700 bg-white py-0.5 px-0.5 focus:outline-none focus:ring-1 focus:ring-green-500 mt-0.5 shadow-sm"
+                                            value={selectedTherapist}
+                                            onChange={(e) => { setSelectedTherapist(e.target.value); setSelectedBS('All'); }}
+                                        >
+                                            {therapists.map(t => <option key={t} value={t}>{t === 'All' ? '全部' : t}</option>)}
+                                        </select>
+                                    </th>
+                                    <th className={`px-1 py-1.5 font-bold hover:bg-gray-200 transition-colors border-b border-r border-gray-200 align-top min-w-[85px] max-w-[85px] w-[85px] sticky left-[235px] z-40 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)] ${sortConfig.key === 'BS' ? 'bg-gray-300 shadow-inner' : 'bg-gray-50'}`}>
+                                        <div className="flex items-center gap-0.5 cursor-pointer mb-1 text-[10px] justify-between" onClick={() => requestSort('BS')}>
+                                            <span className="truncate">BS</span>
+                                            {sortConfig.key === 'BS' ? (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-black" /> : <ChevronDown className="w-4 h-4 flex-shrink-0 text-black" />) : <ChevronDown className="w-3 h-3 opacity-20 flex-shrink-0" />}
+                                        </div>
+                                        <select 
+                                            className="w-full text-[9px] font-normal border border-gray-300 rounded text-gray-700 bg-white py-0.5 px-0.5 focus:outline-none focus:ring-1 focus:ring-green-500 mt-0.5 shadow-sm"
+                                            value={selectedBS}
+                                            onChange={(e) => setSelectedBS(e.target.value)}
+                                        >
+                                            {bsList.map(b => <option key={b} value={b}>{b === 'All' ? '全部' : b}</option>)}
+                                        </select>
+                                    </th>
+                                    
+                                    {/* Sortable Custom KPI Headers mapping their specific background classes */}
+                                    {activeKPIs.map(kpi => (
+                                        <th key={kpi.id} onClick={() => requestSort(kpi.id)} className={`px-1 py-2 font-bold cursor-pointer hover:opacity-80 transition-all border-b border-r border-black/5 text-center group align-top min-w-[70px] text-[10px] ${kpi.headerClass} ${sortConfig.key === kpi.id ? 'brightness-90 shadow-inner border-b-2 border-b-black/30' : ''}`}>
+                                            <div className="flex items-center justify-center gap-0.5 h-full">
+                                                <span className="whitespace-normal break-words leading-tight" title={kpi.displayName}>{kpi.displayName}</span>
+                                                {sortConfig.key === kpi.id ? (
+                                                    sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-black opacity-70" /> : <ChevronDown className="w-4 h-4 flex-shrink-0 text-black opacity-70" />
+                                                ) : <ChevronDown className="w-3 h-3 opacity-0 group-hover:opacity-40 flex-shrink-0" />}
+                                            </div>
+                                        </th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            
+                            <tbody className="divide-y divide-gray-100 relative z-0">
+                                {processedData.length > 0 ? (
+                                    processedData.map((row) => (
+                                        <tr key={row.id} className="hover:bg-gray-50 transition-colors group">
+                                            {/* Frozen Cells in Body */}
+                                            <td className="px-1.5 py-1.5 font-semibold text-[11px] text-gray-800 border-r border-gray-200 bg-white group-hover:bg-gray-50 sticky left-0 z-20 min-w-[60px] max-w-[60px] w-[60px] truncate" title={row.Brand}>{row.Brand}</td>
+                                            <td className="px-1.5 py-1.5 font-semibold text-[11px] text-gray-800 border-r border-gray-200 bg-white group-hover:bg-gray-50 sticky left-[60px] z-20 min-w-[90px] max-w-[90px] w-[90px] truncate" title={row.Center}>{row.Center}</td>
+                                            <td className="px-1.5 py-1.5 text-[11px] text-gray-600 border-r border-gray-200 bg-white group-hover:bg-gray-50 sticky left-[150px] z-20 min-w-[85px] max-w-[85px] w-[85px] truncate" title={row.Therapist}>{row.Therapist}</td>
+                                            <td className="px-1.5 py-1.5 text-[11px] text-gray-600 border-r border-gray-200 bg-white group-hover:bg-gray-50 sticky left-[235px] z-20 min-w-[85px] max-w-[85px] w-[85px] truncate shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)]" title={row.BS}>{row.BS}</td>
+                                            
+                                            {/* Data Cells */}
+                                            {activeKPIs.map(kpi => {
+                                                const condFormat = getConditionalFormat(kpi.name, row[kpi.id], mtdTargetRatio, colRanges);
+                                                return (
+                                                    <td key={kpi.id} 
+                                                        className={`px-1.5 py-1.5 text-center font-bold text-[11px] border-r border-gray-50/50 ${condFormat.className}`}
+                                                        style={condFormat.style}
+                                                    >
+                                                        {formatDisplayValue(row[kpi.id], kpi.format)}
+                                                    </td>
+                                                );
+                                            })}
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={100} className="px-6 py-12 text-center text-gray-500 font-medium bg-gray-50 text-xs">
+                                            找不到符合篩選條件的資料。
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="p-3 border-t border-gray-200 bg-gray-50 text-[11px] text-gray-500 text-right font-medium">
+                        顯示 {processedData.length} 筆資料。
+                    </div>
+                </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
