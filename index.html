@@ -151,7 +151,7 @@
             return fallbackIndex;
         }
 
-        const GOOGLE_SHEET_ID = '1mtORjZ4a5EyrlPJsiejhXuMZiyw5MStoXdxn5l1Jhno';
+        const GOOGLE_SHEET_ID = '1FVFQlYjFkPfq92prinE582eKUXc8Kdd7aBoH0VshKjs';
 
         function App() {
             const [data, setData] = useState([]);
@@ -178,10 +178,10 @@
                     const sheetId = GOOGLE_SHEET_ID;
                     
                     // ==========================================
-                    // 💡 UPDATE: Changed Data Range to A:AG
+                    // 💡 UPDATE: Changed Data Range to A:AG & Using specific GID
                     // ==========================================
                     const urls = [
-                        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('(WEB) real time (SH)')}&range=A:AG`
+                        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=583294442&range=A:AG`
                     ];
 
                     const [realTimeRes] = await Promise.all(
@@ -241,7 +241,7 @@
                         totalSalesMonth: getDynamicIndex(extractedHeaders, ['本月總業績$$'], 8),
                         mtdPercent: getDynamicIndex(extractedHeaders, ['MTD%'], 9),
                         turnLightMissing: getDynamicIndex(extractedHeaders, ['轉燈尚欠$$'], 10),
-                        todaySales: getDynamicIndex(extractedHeaders, ['今日開單 $$', '今日開單$$'], 11),
+                        todaySales: getDynamicIndex(extractedHeaders, ['今日銷售額', '今日銷售額 $$', '今日開單 $$', '今日開單$$'], 11),
 
                         futureICB: getDynamicIndex(extractedHeaders, ['未來 ICB Booking'], 14), 
                         yesterdayShow: getDynamicIndex(extractedHeaders, ['昨天SHOW'], 12), 
@@ -323,7 +323,7 @@
                     { id: 'totalSalesMonth', index: colMap.totalSalesMonth, name: '本月總業績$$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
                     { id: 'mtdPercent', index: colMap.mtdPercent, name: 'MTD%', format: 'percent', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
                     { id: 'turnLightMissing', index: colMap.turnLightMissing, name: '轉燈尚欠$$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
-                    { id: 'todaySales', index: colMap.todaySales, name: '今日開單 $$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
+                    { id: 'todaySales', index: colMap.todaySales, name: '今日銷售額', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
 
                     // 862+ICB Group
                     { id: 'futureICB', index: colMap.futureICB, name: '未來 ICB Booking', format: 'number', headerClass: 'bg-orange-100 text-orange-900 border-t border-orange-200' },
@@ -525,6 +525,9 @@
                         sums.mauPercent = sums.mauPercent / processedData.length; 
                     }
                 }
+
+                // 強制讓上方紫燈的「今日開單 $$」嚴格等於下方表格當前顯示資料的真實加總
+                sums.todaySales = processedData.reduce((sum, currentItem) => sum + (currentItem.todaySales || 0), 0);
 
                 return sums;
             }, [selectedBrand, selectedCenter, selectedTherapist, searchTerm, processedData, grandTotalRow, colMap]);
