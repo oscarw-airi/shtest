@@ -11,7 +11,7 @@
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-[#f0f9f4]">
+<body class="bg-[#f0f9f4] text-slate-800 font-sans antialiased">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -35,6 +35,8 @@
         const Zap = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
         const Gift = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polyline points="20 12 20 22 4 22 4 12"/><rect width="20" height="5" x="2" y="7"/><line x1="12" x2="12" y1="22" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>;
         const UserIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+        const Sparkles = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/><path d="M5 3v4"/><path d="M19 17v4"/><path d="M3 5h4"/><path d="M17 19h4"/></svg>;
+        const XIcon = ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>;
 
         function parseCSV(text) {
             const result = [];
@@ -60,7 +62,7 @@
             const clean = String(val).replace(/,/g, '').replace(/%/g, '').replace(/\$/g, '').replace(/¥/g, '');
             const num = parseFloat(clean);
             return isNaN(num) ? 0 : num;
-        };
+        }
 
         const formatShortCurrency = (val) => {
             if (val === undefined || isNaN(val)) return '-';
@@ -81,8 +83,8 @@
         const formatDateToYMD = (dateObj) => {
             if (!dateObj) return '';
             const y = dateObj.getFullYear();
-            const m = dateObj.getMonth() + 1;
-            const d = dateObj.getDate();
+            const m = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const d = String(dateObj.getDate()).padStart(2, '0');
             const timeStr = dateObj.toLocaleTimeString('zh-HK', { hour12: false });
             return `${y}年${m}月${d}日 ${timeStr}`;
         };
@@ -121,7 +123,6 @@
                 else className += 'bg-red-200';
             }
             else if (['今天 Full course', '體驗療程開單 (今天)', 'MAU %', '滲透率%'].includes(colName)) {
-                // Color Gradient (Low to High = Red to Green)
                 const range = ranges[colName];
                 if (range && range.max > range.min) {
                     const ratio = (num - range.min) / (range.max - range.min);
@@ -153,6 +154,15 @@
 
         const GOOGLE_SHEET_ID = '1FVFQlYjFkPfq92prinE582eKUXc8Kdd7aBoH0VshKjs';
 
+        // Custom Hook for formatting values based on KPI definitions
+        const formatValue = (val, formatType) => {
+            if (val === null || val === undefined) return '-';
+            if (formatType === 'currency') return formatShortCurrency(val);
+            if (formatType === 'percent') return (val * 100).toFixed(1) + '%';
+            if (formatType === 'number') return val.toLocaleString();
+            return val;
+        };
+
         function App() {
             const [data, setData] = useState([]);
             const [headers, setHeaders] = useState([]);
@@ -172,14 +182,86 @@
             
             const [sortConfig, setSortConfig] = useState({ key: null, direction: 'asc' });
 
+            // Gemini AI States
+            const [insightLoading, setInsightLoading] = useState(false);
+            const [insightText, setInsightText] = useState(null);
+            const [isInsightModalOpen, setIsInsightModalOpen] = useState(false);
+            
+            const [coachingData, setCoachingData] = useState({ open: false, loading: false, therapist: null, text: null });
+
+            // Gemini API Integration with Exponential Backoff
+            const callGeminiWithBackoff = async (prompt, retries = 5) => {
+                const apiKey = ""; // API key is injected by the environment
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                const payload = {
+                    contents: [{ parts: [{ text: prompt }] }]
+                };
+
+                const delays = [1000, 2000, 4000, 8000, 16000];
+
+                for (let i = 0; i < retries; i++) {
+                    try {
+                        const response = await fetch(url, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                        const result = await response.json();
+                        return result.candidates?.[0]?.content?.parts?.[0]?.text || "No insights could be generated.";
+                    } catch (error) {
+                        if (i === retries - 1) throw error;
+                        await new Promise(res => setTimeout(res, delays[i]));
+                    }
+                }
+            };
+
+            const generateInsights = async () => {
+                if (!processedData.length) return;
+                setIsInsightModalOpen(true);
+                setInsightLoading(true);
+                setInsightText(null);
+                
+                try {
+                    // Extract a snapshot of the top rows to avoid token overload
+                    const snapshot = processedData.slice(0, 15).map(r => 
+                        `${r.Therapist} (${r.Brand} - ${r.Center}): Sales MTD ${formatValue(r.totalSalesMonth, 'currency')}, Bookings ${r.futureICB}, Today Shows ${r.yesterdayShow}`
+                    ).join('\n');
+                    
+                    const prompt = `You are an expert sales analyst for a beauty/wellness clinic analyzing the 'Shanghai Girls Collagen Festival' campaign. 
+                    Based on the following data snapshot of top performers:\n\n${snapshot}\n\n
+                    Provide a brief, encouraging 2-paragraph executive summary in Traditional Chinese highlighting overall performance strengths and one specific area of focus or opportunity. Keep it professional, motivating, and strictly based on the numbers provided.`;
+                    
+                    const result = await callGeminiWithBackoff(prompt);
+                    setInsightText(result);
+                } catch(e) {
+                    setInsightText("Failed to generate insights. Please try again later.");
+                } finally {
+                    setInsightLoading(false);
+                }
+            };
+
+            const getTherapistCoaching = async (row) => {
+                setCoachingData({ open: true, loading: true, therapist: row.Therapist, text: null });
+                try {
+                    // Extract relevant KPIs for this specific therapist
+                    const metrics = activeKPIs.slice(0, 8).map(k => `${k.displayName}: ${formatValue(row[k.id], k.format)}`).join(', ');
+                    
+                    const prompt = `You are a supportive, high-energy sales coach. Your therapist, ${row.Therapist}, has the following performance metrics today: ${metrics}. 
+                    Write them a brief, 3-sentence personalized feedback message in Traditional Chinese. Start by praising a strong metric, then offer one polite, actionable tip for improvement. Tone should be uplifting and encouraging.`;
+                    
+                    const result = await callGeminiWithBackoff(prompt);
+                    setCoachingData({ open: true, loading: false, therapist: row.Therapist, text: result });
+                } catch(e) {
+                    setCoachingData(prev => ({ ...prev, loading: false, text: "Could not fetch coaching tips at this time." }));
+                }
+            };
+
             const fetchData = useCallback(async () => {
                 try {
                     setLoading(true);
                     const sheetId = GOOGLE_SHEET_ID;
                     
-                    // ==========================================
-                    // 💡 UPDATE: Changed Data Range to A:AG & Using specific GID
-                    // ==========================================
                     const urls = [
                         `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=583294442&range=A:AG`
                     ];
@@ -192,7 +274,6 @@
                     
                     const realTimeCsv = await realTimeRes.text();
                     
-                    // Added Try-Catch specifically around parsing to prevent silent failures on bad data
                     let realTimeParsed;
                     try {
                         realTimeParsed = parseCSV(realTimeCsv);
@@ -206,7 +287,6 @@
 
                     let targetRatio = null;
                     if (realTimeParsed.length > 2) {
-                        // 💡 UPDATE: Safe Check for indices outside of the A:AG range (Index 61 & 64)
                         const bj3 = realTimeParsed[2][61] !== undefined ? parseNumber(realTimeParsed[2][61]) : 0;
                         const bm2 = realTimeParsed[1][64] !== undefined ? parseNumber(realTimeParsed[1][64]) : 0;
                         if (bm2 > 0) {
@@ -232,11 +312,9 @@
                         therapist: getDynamicIndex(extractedHeaders, ['Therapist'], 3),
                         bs: getDynamicIndex(extractedHeaders, ['BS'], 4),
                         
-                        // CB 區域對應 F, G
                         cb1: getDynamicIndex(extractedHeaders, ['ACB', 'acb', 'CB1'], 5), 
                         cb2: getDynamicIndex(extractedHeaders, ['ICB', 'icb', 'CB2'], 6), 
                         
-                        // 200% Purple Light 對應 H 到 L
                         targetMonth: getDynamicIndex(extractedHeaders, ['本月目標$$'], 7),
                         totalSalesMonth: getDynamicIndex(extractedHeaders, ['本月總業績$$'], 8),
                         mtdPercent: getDynamicIndex(extractedHeaders, ['MTD%'], 9),
@@ -262,9 +340,9 @@
                         plasmaBook: getDynamicIndex(extractedHeaders, ['Plasma Giftcard Book', 'PlasmaGiftcard Book'], 25),
                         plasmaDelta: getDynamicIndex(extractedHeaders, ['Plasma Giftcard 三天增加', 'PlasmaGiftcard三天增加'], 26),
 
-                        // 直播激活 對應 source col AB - AG (Indices 27 to 32)
                         liveAB: getDynamicIndex(extractedHeaders, ['RSVP(ACB)', 'rsvp(acb)', 'RSVP (ACB)', 'RSVP', 'rsvp'], 27), 
                         liveAC: getDynamicIndex(extractedHeaders, ['RSVP(ICB)', 'rsvp(icb)', 'RSVP (ICB)', 'Book', 'book'], 28), 
+                        liveView: getDynamicIndex(extractedHeaders, ['View', 'view', '觀看'], 33),
                         liveAD: getDynamicIndex(extractedHeaders, ['Book(ACB)', 'book(acb)', 'Book (ACB)', 'Show', 'show'], 29), 
                         liveAE: getDynamicIndex(extractedHeaders, ['Book(ICB)', 'book(icb)', 'Book (ICB)', 'Sign', 'sign'], 30),
                         liveAF: getDynamicIndex(extractedHeaders, ['Show', 'show', 'Live AF', 'af'], 31),
@@ -302,55 +380,47 @@
                 }
             }, []);
 
-            // AUTO-REFRESH Implementation (Every 5 minutes)
             useEffect(() => {
                 fetchData();
-                const intervalId = setInterval(fetchData, 5 * 60 * 1000); // 300,000 ms
-                return () => clearInterval(intervalId); // Cleanup on unmount
+                const intervalId = setInterval(fetchData, 5 * 60 * 1000); 
+                return () => clearInterval(intervalId); 
             }, [fetchData]);
 
-            // Constructing Active KPI Table Definitions Dynamically
             const activeKPIs = useMemo(() => {
                 if (!colMap) return [];
                 
                 return [
-                    // CB Group
                     { id: 'cb1', index: colMap.cb1, name: 'ACB', format: 'number', headerClass: 'bg-cyan-100 text-cyan-900 border-t border-cyan-200' },
                     { id: 'cb2', index: colMap.cb2, name: 'ICB', format: 'number', headerClass: 'bg-cyan-100 text-cyan-900 border-t border-cyan-200' },
 
-                    // 200% Purple Light Group
                     { id: 'targetMonth', index: colMap.targetMonth, name: '本月目標$$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
                     { id: 'totalSalesMonth', index: colMap.totalSalesMonth, name: '本月總業績$$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
                     { id: 'mtdPercent', index: colMap.mtdPercent, name: 'MTD%', format: 'percent', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
                     { id: 'turnLightMissing', index: colMap.turnLightMissing, name: '轉燈尚欠$$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
                     { id: 'todaySales', index: colMap.todaySales, name: '今日銷售額', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
 
-                    // 862+ICB Group
                     { id: 'futureICB', index: colMap.futureICB, name: '未來 ICB Booking', format: 'number', headerClass: 'bg-orange-100 text-orange-900 border-t border-orange-200' },
                     { id: 'yesterdayShow', index: colMap.yesterdayShow, name: '昨天SHOW', format: 'number', headerClass: 'bg-orange-100 text-orange-900 border-t border-orange-200' },
                     { id: 'yesterdayShowICB', index: colMap.yesterdayShowICB, name: '昨天SHOW (ICB)', format: 'number', headerClass: 'bg-orange-100 text-orange-900 border-t border-orange-200' },
 
-                    // 200 Nodes Group
                     { id: 'node', index: colMap.node, name: '分發點總數', format: 'number', headerClass: 'bg-blue-100 text-blue-900 border-t border-blue-200' },
                     { id: 'mauPercent', index: colMap.mauPercent, name: 'MAU %', format: 'percent', headerClass: 'bg-blue-100 text-blue-900 border-t border-blue-200' },
                     { id: 'node3Days', index: colMap.node3Days, name: '3天增加', format: 'number', headerClass: 'bg-blue-100 text-blue-900 border-t border-blue-200' },
                     
-                    // High Pexo PT/Head Group
                     { id: 'trialTodayMain', index: colMap.trialTodayMain, name: '體驗療程開單(今天)', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
                     { id: 'trialTodayBracket', index: colMap.trialTodayBracket, name: '今天 PT QTY', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
                     { id: 'packageTodayMain', index: colMap.packageTodayMain, name: '套餐 (Package)開單(今天)', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
                     { id: 'packageTodayBracket', index: colMap.packageTodayBracket, name: '今天 Full course', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
                     { id: 'penetrationRate', index: colMap.penetrationRate, name: '滲透率%', format: 'percent', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
                     
-                    // 龍尾 (Dragon Tail) Group
                     { id: 'bdayBook', index: colMap.bdayBook, name: '生日 Giftcard Book', format: 'number', headerClass: 'bg-yellow-100 text-yellow-900 border-t border-yellow-200' },
                     { id: 'bdayDelta', index: colMap.bdayDelta, name: '生日 Giftcard 三天增加', format: 'number', headerClass: 'bg-yellow-100 text-yellow-900 border-t border-yellow-200' },
                     { id: 'plasmaBook', index: colMap.plasmaBook, name: 'Plasma Giftcard Book', format: 'number', headerClass: 'bg-yellow-100 text-yellow-900 border-t border-yellow-200' },
                     { id: 'plasmaDelta', index: colMap.plasmaDelta, name: 'Plasma Giftcard 三天增加', format: 'number', headerClass: 'bg-yellow-100 text-yellow-900 border-t border-yellow-200' },
 
-                    // 直播激活 (Grape purple) Group
                     { id: 'liveAB', index: colMap.liveAB, name: 'RSVP(ACB)', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' },
                     { id: 'liveAC', index: colMap.liveAC, name: 'RSVP(ICB)', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' },
+                    { id: 'liveView', index: colMap.liveView, name: 'View', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' },
                     { id: 'liveAD', index: colMap.liveAD, name: 'Book(ACB)', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' },
                     { id: 'liveAE', index: colMap.liveAE, name: 'Book(ICB)', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' },
                     { id: 'liveAF', index: colMap.liveAF, name: 'Show', format: 'number', headerClass: 'bg-fuchsia-100 text-fuchsia-900 border-t border-fuchsia-200' },
@@ -391,7 +461,6 @@
                 return ['All', ...new Set(therapistFiltered.map(r => r[colMap.bs]).filter(Boolean))];
             }, [data, selectedBrand, selectedCenter, selectedTherapist, colMap]);
 
-            // PERFORMANCE FIX: Single Pass Filter & Map
             const processedData = useMemo(() => {
                 if (!colMap || activeKPIs.length === 0) return [];
                 
@@ -432,7 +501,7 @@
                     });
                 }
                 return result;
-            }, [data, searchTerm, selectedBrand, selectedCenter, selectedTherapist, sortConfig, activeKPIs, colMap]);
+            }, [data, searchTerm, selectedBrand, selectedCenter, selectedTherapist, selectedBS, sortConfig, activeKPIs, colMap]);
 
             const colRanges = useMemo(() => {
                 const ranges = {};
@@ -451,574 +520,383 @@
                 return ranges;
             }, [processedData, activeKPIs]);
 
-            const summaryData = useMemo(() => {
-                const isFiltered = selectedBrand !== 'All' || selectedCenter !== 'All' || selectedTherapist !== 'All' || selectedBS !== 'All' || searchTerm !== '';
-                
-                let sums = {
-                    totalNodes: 0, nodeDelta: 0, mauPercent: 0,
-                    futureICB: 0, yesterdayShow: 0, yesterdayShowICB: 0,
-                    trialTodayMain: 0, trialTodayBracket: 0, packageTodayMain: 0, packageTodayBracket: 0,
-                    penetrationRate: 0, targetMonth: 0, totalSalesMonth: 0, mtdPercent: 0, turnLightMissing: 0, todaySales: 0,
-                    bdayBook: 0, bdayDelta: 0, plasmaBook: 0, plasmaDelta: 0
-                };
-
-                if (!colMap) return sums;
-
-                if (!isFiltered && grandTotalRow) {
-                    sums.totalNodes = parseNumber(grandTotalRow[colMap.node]);
-                    sums.nodeDelta = parseNumber(grandTotalRow[colMap.node3Days]);
-                    sums.mauPercent = parseNumber(grandTotalRow[colMap.mauPercent]);
-                    
-                    sums.futureICB = parseNumber(grandTotalRow[colMap.futureICB]);
-                    sums.yesterdayShow = parseNumber(grandTotalRow[colMap.yesterdayShow]);
-                    sums.yesterdayShowICB = parseNumber(grandTotalRow[colMap.yesterdayShowICB]);
-                    
-                    sums.trialTodayMain = parseNumber(grandTotalRow[colMap.trialTodayMain]);        
-                    sums.trialTodayBracket = parseNumber(grandTotalRow[colMap.trialTodayBracket]);   
-                    sums.packageTodayMain = parseNumber(grandTotalRow[colMap.packageTodayMain]);
-                    sums.packageTodayBracket = parseNumber(grandTotalRow[colMap.packageTodayBracket]); 
-                    sums.penetrationRate = parseNumber(grandTotalRow[colMap.penetrationRate]);    
-                    
-                    sums.targetMonth = parseNumber(grandTotalRow[colMap.targetMonth]);
-                    sums.totalSalesMonth = parseNumber(grandTotalRow[colMap.totalSalesMonth]);
-                    sums.mtdPercent = parseNumber(grandTotalRow[colMap.mtdPercent]);    
-                    sums.turnLightMissing = parseNumber(grandTotalRow[colMap.turnLightMissing]);
-                    sums.todaySales = parseNumber(grandTotalRow[colMap.todaySales]);         
-
-                    sums.bdayBook = parseNumber(grandTotalRow[colMap.bdayBook]);
-                    sums.bdayDelta = parseNumber(grandTotalRow[colMap.bdayDelta]);
-                    sums.plasmaBook = parseNumber(grandTotalRow[colMap.plasmaBook]);
-                    sums.plasmaDelta = parseNumber(grandTotalRow[colMap.plasmaDelta]);
-                } else {
-                    processedData.forEach(item => {
-                        sums.totalNodes += item.node;
-                        sums.nodeDelta += item.node3Days;
-                        sums.mauPercent += item.mauPercent;
-                        
-                        sums.futureICB += item.futureICB;
-                        sums.yesterdayShow += item.yesterdayShow; 
-                        sums.yesterdayShowICB += item.yesterdayShowICB;
-                        
-                        sums.trialTodayMain += item.trialTodayMain;
-                        sums.trialTodayBracket += item.trialTodayBracket;
-                        
-                        sums.packageTodayMain += item.packageTodayMain;
-                        sums.packageTodayBracket += item.packageTodayBracket; 
-                        
-                        sums.penetrationRate += item.penetrationRate;
-                        
-                        sums.targetMonth += item.targetMonth;
-                        sums.totalSalesMonth += item.totalSalesMonth;
-                        sums.mtdPercent += item.mtdPercent;
-                        sums.turnLightMissing += item.turnLightMissing;
-                        sums.todaySales += item.todaySales;
-
-                        sums.bdayBook += item.bdayBook;
-                        sums.bdayDelta += item.bdayDelta;
-                        sums.plasmaBook += item.plasmaBook;
-                        sums.plasmaDelta += item.plasmaDelta;
-                    });
-                    
-                    if (processedData.length > 0) {
-                        sums.mtdPercent = sums.mtdPercent / processedData.length;
-                        sums.penetrationRate = sums.penetrationRate / processedData.length; 
-                        sums.mauPercent = sums.mauPercent / processedData.length; 
-                    }
-                }
-
-                // 強制讓上方紫燈的「今日開單 $$」嚴格等於下方表格當前顯示資料的真實加總
-                sums.todaySales = processedData.reduce((sum, currentItem) => sum + (currentItem.todaySales || 0), 0);
-
-                return sums;
-            }, [selectedBrand, selectedCenter, selectedTherapist, searchTerm, processedData, grandTotalRow, colMap]);
-
-            const requestSort = (key) => {
+            // Event Handlers
+            const handleSort = (key) => {
                 let direction = 'asc';
-                if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+                if (sortConfig.key === key && sortConfig.direction === 'asc') {
+                    direction = 'desc';
+                }
                 setSortConfig({ key, direction });
             };
 
-            const formatDisplayValue = (val, format) => {
-                if (val === undefined || isNaN(val)) return '-';
-                if (format === 'percent') return `${val.toFixed(2)}%`;
-                if (format === 'currency') return `$${val.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-                return Number.isInteger(val) ? val.toLocaleString() : val.toFixed(2).replace(/\.00$/, '');
-            };
-
             const exportToCSV = () => {
-                const csvHeaders = ['品牌', '樓層', '治療師', 'BS', ...activeKPIs.map(kpi => kpi.displayName)];
+                if (!processedData.length) return;
                 
-                const csvRows = processedData.map(row => {
-                    const rowData = [
-                        row.Brand,
-                        row.Center,
-                        row.Therapist,
-                        row.BS,
-                        ...activeKPIs.map(kpi => formatDisplayValue(row[kpi.id], kpi.format))
-                    ];
-                    return rowData.map(val => `"${String(val).replace(/"/g, '""')}"`).join(',');
+                const baseKeys = ['Brand', 'Center', 'Therapist', 'BS'];
+                const kpiKeys = activeKPIs.map(k => k.id);
+                const allKeys = [...baseKeys, ...kpiKeys];
+                
+                const headerRow = [...baseKeys, ...activeKPIs.map(k => k.displayName)];
+                
+                let csvContent = "data:text/csv;charset=utf-8,\uFEFF" + headerRow.join(",") + "\n";
+                
+                processedData.forEach(row => {
+                    const rowData = allKeys.map(key => {
+                        let cell = row[key];
+                        if (cell === null || cell === undefined) cell = '';
+                        // Format specifically for CSV slightly differently if needed, 
+                        // but raw values are usually better for exports. We'll use raw values.
+                        cell = String(cell).replace(/"/g, '""');
+                        return `"${cell}"`;
+                    });
+                    csvContent += rowData.join(",") + "\n";
                 });
 
-                const csvContent = [
-                    csvHeaders.map(h => `"${String(h).replace(/"/g, '""')}"`).join(','), 
-                    ...csvRows
-                ].join('\n');
-                
-                const blob = new Blob(["\ufeff", csvContent], { type: 'text/csv;charset=utf-8;' });
-                const url = URL.createObjectURL(blob);
+                const encodedUri = encodeURI(csvContent);
                 const link = document.createElement("a");
-                link.setAttribute("href", url);
-                link.setAttribute("download", `SH_Collagen_Festival_Data_${new Date().toISOString().slice(0,10)}.csv`);
+                link.setAttribute("href", encodedUri);
+                link.setAttribute("download", `shanghai_girls_festival_${new Date().getTime()}.csv`);
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
             };
 
-            if (loading && data.length === 0) return (
-                <div className="flex h-screen w-full items-center justify-center bg-[#f0f9f4]">
-                    <div className="flex flex-col items-center gap-4">
-                        <div className="h-12 w-12 animate-spin rounded-full border-4 border-green-500 border-t-transparent"></div>
-                        <p className="text-gray-600 font-medium">正在載入實時數據...</p>
+            // Summary Card Component
+            const SummaryCard = ({ title, value, icon: Icon, colorClass }) => (
+                <div className={`bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex items-center gap-4 ${colorClass || ''}`}>
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-lg">
+                        {Icon}
+                    </div>
+                    <div>
+                        <p className="text-sm text-gray-500 font-medium">{title}</p>
+                        <h3 className="text-xl font-bold text-gray-900 mt-1">{value}</h3>
                     </div>
                 </div>
             );
 
-            return (
-                <div className="min-h-screen bg-[#f0f9f4] p-2 sm:p-4 lg:px-6 xl:px-8 font-sans text-gray-800">
-                
-                {/* Header & Controls */}
-                <div className="mb-6 flex flex-col gap-4 bg-white p-5 rounded-xl shadow-sm border border-green-100">
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center w-full gap-4">
-                        <h1 className="text-3xl font-extrabold flex items-center gap-3 text-black">
-                            <Skyline className="text-emerald-600 w-8 h-8 flex-shrink-0" /> 
-                            <span className="drop-shadow-sm text-emerald-900">上海少女膠原節：實時成績</span>
-                        </h1>
-                        <div className="flex items-center gap-3 text-sm text-gray-600">
-                            {lastSyncTime && <span className="font-medium">最後更新：{formatDateToYMD(lastSyncTime)}</span>}
-                            <button 
-                                onClick={fetchData} 
-                                disabled={loading} 
-                                className="flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-700 font-semibold rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50 border border-green-200"
-                            >
-                                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                                {loading ? '同步中...' : '重新同步'}
+            if (error) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-4">
+                        <div className="bg-white rounded-xl shadow-lg p-6 max-w-md w-full text-center">
+                            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+                            <h2 className="text-xl font-bold text-gray-900 mb-2">Error Loading Data</h2>
+                            <p className="text-gray-600">{error}</p>
+                            <button onClick={fetchData} className="mt-6 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center justify-center gap-2 w-full">
+                                <RefreshCw className="w-4 h-4" /> Try Again
                             </button>
                         </div>
                     </div>
-                    
-                    {/* Filters */}
-                    <div className="flex flex-col sm:flex-row gap-3 w-full items-center pt-3 border-t border-gray-100">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-gray-600 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                            <FilterIcon className="w-4 h-4" /> 篩選：
-                        </div>
-                        <select 
-                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-sm min-w-[140px]"
-                            value={selectedBrand} 
-                            onChange={(e) => { setSelectedBrand(e.target.value); setSelectedCenter('All'); setSelectedTherapist('All'); setSelectedBS('All'); }}
-                        >
-                            {brands.map(b => (
-                                <option key={b} value={b}>{b === 'All' ? '所有品牌' : b}</option>
-                            ))}
-                        </select>
-                        <select 
-                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-sm min-w-[140px]"
-                            value={selectedCenter} 
-                            onChange={(e) => { setSelectedCenter(e.target.value); setSelectedTherapist('All'); setSelectedBS('All'); }}
-                        >
-                            {centers.map(c => (
-                                <option key={c} value={c}>{c === 'All' ? '所有樓層' : c}</option>
-                            ))}
-                        </select>
-                        <select 
-                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-sm min-w-[140px]"
-                            value={selectedTherapist} 
-                            onChange={(e) => { setSelectedTherapist(e.target.value); setSelectedBS('All'); }}
-                        >
-                            {therapists.map(t => (
-                                <option key={t} value={t}>{t === 'All' ? '所有治療師' : t}</option>
-                            ))}
-                        </select>
-                        <select 
-                            className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-white shadow-sm min-w-[140px]"
-                            value={selectedBS} 
-                            onChange={(e) => setSelectedBS(e.target.value)}
-                        >
-                            {bsList.map(b => (
-                                <option key={b} value={b}>{b === 'All' ? '所有 BS' : b}</option>
-                            ))}
-                        </select>
-                        <div className="relative">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                            <input
-                                type="text" placeholder="搜尋資料..."
-                                className="pl-9 pr-4 py-2 bg-white shadow-sm border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-500 w-full"
-                                value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                </div>
+                );
+            }
 
-                {error && (
-                    <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl flex items-start gap-3">
-                        <AlertCircle className="shrink-0 w-5 h-5 mt-0.5" />
-                        <div>
-                            <h3 className="font-semibold">無法獲取實時報表數據</h3>
-                            <p className="text-sm mt-1">{error}</p>
-                            <p className="text-sm mt-1 font-medium">目前顯示備用視覺結構。</p>
-                        </div>
-                    </div>
-                )}
-
-                {/* --- DYNAMIC THERAPIST HEADER (Shows only when therapist is selected) --- */}
-                {(selectedTherapist !== 'All' || selectedBS !== 'All') && (
-                    <div className="mb-4 flex flex-wrap items-center justify-center gap-3">
-                        <div className="bg-white px-5 py-2.5 rounded-full shadow-sm border border-green-200 flex items-center gap-2">
-                            <span className="text-gray-500 text-sm font-bold">樓層：</span>
-                            <span className="font-bold text-gray-800">{processedData.length > 0 ? processedData[0].Center : (selectedCenter !== 'All' ? selectedCenter : '-')}</span>
-                        </div>
-                        {selectedTherapist !== 'All' && (
-                            <div className="bg-green-600 px-5 py-2.5 rounded-full shadow-md border border-green-700 flex items-center gap-2 text-white">
-                                <UserIcon className="w-4 h-4 text-green-100" />
-                                <span className="text-green-100 text-sm font-bold">治療師：</span>
-                                <span className="font-extrabold">{selectedTherapist}</span>
-                            </div>
-                        )}
-                        {selectedBS !== 'All' && (
-                            <div className="bg-blue-600 px-5 py-2.5 rounded-full shadow-md border border-blue-700 flex items-center gap-2 text-white">
-                                <UserIcon className="w-4 h-4 text-blue-100" />
-                                <span className="text-blue-100 text-sm font-bold">BS：</span>
-                                <span className="font-extrabold">{selectedBS}</span>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* --- SUMMARY PANEL --- */}
-                <div className="flex flex-wrap justify-center items-stretch gap-4 mb-10">
-                    
-                    {/* 1st Section (Purple Box) - 200% 紫燈 */}
-                    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.667rem)] xl:w-[calc(20%-0.8rem)] bg-purple-600 rounded-xl p-3 flex flex-col shadow-lg h-full transition-transform hover:-translate-y-1">
-                        <h3 className="flex items-center justify-center gap-1.5 font-bold text-lg mb-2 border-b border-purple-400 pb-1 tracking-wide text-white">
-                            <Zap className="w-5 h-5 text-purple-200" />
-                            200% 紫燈
-                        </h3>
-                        
-                        <div className="flex flex-col justify-between h-full gap-2">
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="flex flex-col items-center bg-white/70 rounded-lg py-3 justify-center shadow-sm">
-                                    <div className="text-2xl font-extrabold text-gray-800">
-                                        {selectedTherapist === 'All' ? '無此數' : `${summaryData.mtdPercent.toFixed(2)}%`}
+            return (
+                <div className="min-h-screen bg-[#f8fafc] pb-10">
+                    {/* Header */}
+                    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-30">
+                        <div className="max-w-screen-3xl mx-auto px-4 sm:px-6 lg:px-8">
+                            <div className="flex justify-between items-center h-16">
+                                <div className="flex items-center gap-3">
+                                    <div className="p-2 bg-indigo-600 rounded-lg text-white">
+                                        <Skyline className="w-6 h-6" />
                                     </div>
-                                    <span className="text-[10px] text-gray-700 mt-1 font-bold uppercase tracking-wider">Today MTD%</span>
+                                    <h1 className="text-xl font-bold text-gray-900 hidden sm:block">上海少女膠原節：實時成績</h1>
+                                    <h1 className="text-xl font-bold text-gray-900 sm:hidden">實時成績</h1>
                                 </div>
-                                
-                                <div className="flex flex-col items-center bg-white/70 rounded-lg py-3 justify-center shadow-sm">
-                                    <div className="text-2xl font-extrabold text-gray-800">{formatShortCurrency(summaryData.todaySales)}</div>
-                                    <span className="text-[10px] text-gray-700 mt-1 font-bold uppercase tracking-wider">今日銷售額</span>
-                                </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-3 gap-1 mt-auto">
-                                <div className="bg-white/70 border border-white/50 rounded-lg p-1.5 flex flex-col justify-center items-center text-center shadow-inner">
-                                    <span className="text-sm font-extrabold text-gray-800">{formatShortCurrency(summaryData.turnLightMissing)}</span>
-                                    <span className="text-[9px] text-gray-700 font-bold uppercase leading-tight mt-1">轉燈尚欠$$</span>
-                                </div>
-                                <div className="bg-white/70 border border-white/50 rounded-lg p-1.5 flex flex-col justify-center items-center text-center shadow-inner">
-                                    <span className="text-sm font-extrabold text-gray-800">{formatShortCurrency2Decimals(summaryData.totalSalesMonth)}</span>
-                                    <span className="text-[9px] text-gray-700 font-bold uppercase leading-tight mt-1">本月總業績$$</span>
-                                </div>
-                                <div className="bg-white/70 border border-white/50 rounded-lg p-1.5 flex flex-col justify-center items-center text-center shadow-inner">
-                                    <span className="text-sm font-extrabold text-gray-800">{formatShortCurrency2Decimals(summaryData.targetMonth)}</span>
-                                    <span className="text-[9px] text-gray-700 font-bold uppercase leading-tight mt-1">本月目標$$</span>
+                                <div className="flex items-center gap-4">
+                                    {lastSyncTime && (
+                                        <span className="text-xs text-gray-500 hidden md:block">
+                                            最後更新: {formatDateToYMD(lastSyncTime)}
+                                        </span>
+                                    )}
+                                    <button 
+                                        onClick={fetchData} 
+                                        disabled={loading}
+                                        className="p-2 text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-2"
+                                        title="Refresh Data"
+                                    >
+                                        <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin text-indigo-600' : ''}`} />
+                                        <span className="text-sm font-medium hidden sm:block">{loading ? 'Updating...' : 'Refresh'}</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </header>
 
-                    {/* 2nd Section (Orange Box) */}
-                    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.667rem)] xl:w-[calc(20%-0.8rem)] bg-orange-500 rounded-xl p-3 flex flex-col shadow-lg h-full transition-transform hover:-translate-y-1">
-                        <h3 className="flex items-center justify-center gap-1.5 font-bold text-lg mb-2 border-b border-orange-400 pb-1 tracking-wide text-white">
-                            <CalendarCheck className="w-5 h-5 text-orange-200" />
-                            862+ICB
-                        </h3>
-                        
-                        <div className="flex flex-col items-center bg-white/70 rounded-lg py-2 mb-2 shadow-sm">
-                            <span className="text-4xl font-extrabold text-gray-800">{summaryData.futureICB.toLocaleString()}</span>
-                            <span className="text-xs text-gray-700 mt-1 uppercase tracking-wider font-bold">未來 ICB Booking</span>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 gap-2 mt-auto">
-                            <div className="bg-white/70 border border-white/50 rounded-lg p-2 flex flex-col justify-center items-center text-center shadow-inner">
-                                <span className="text-xl font-extrabold text-gray-800">{summaryData.yesterdayShow.toLocaleString()}</span>
-                                <span className="text-[10px] text-gray-700 font-bold uppercase leading-tight mt-1">昨天<br/>SHOW</span>
+                    <main className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                        {/* Summary Top Cards */}
+                        {grandTotalRow && colMap && (
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                                <SummaryCard 
+                                    title="本月總業績" 
+                                    value={formatShortCurrency(parseNumber(grandTotalRow[colMap.totalSalesMonth]))} 
+                                    icon={<TrendingUp className="w-6 h-6" />} 
+                                />
+                                <SummaryCard 
+                                    title="今日銷售額" 
+                                    value={formatShortCurrency(parseNumber(grandTotalRow[colMap.todaySales]))} 
+                                    icon={<Zap className="w-6 h-6" />} 
+                                />
+                                <SummaryCard 
+                                    title="體驗療程開單(今天)" 
+                                    value={parseNumber(grandTotalRow[colMap.trialTodayMain]).toLocaleString()} 
+                                    icon={<Gift className="w-6 h-6" />} 
+                                />
+                                <SummaryCard 
+                                    title="未來 ICB Booking" 
+                                    value={parseNumber(grandTotalRow[colMap.futureICB]).toLocaleString()} 
+                                    icon={<CalendarCheck className="w-6 h-6" />} 
+                                />
                             </div>
-                            <div className="bg-white/70 border border-white/50 rounded-lg p-2 flex flex-col justify-center items-center text-center shadow-inner">
-                                <span className="text-xl font-extrabold text-gray-800">{summaryData.yesterdayShowICB.toLocaleString()}</span>
-                                <span className="text-[10px] text-gray-700 font-bold uppercase leading-tight mt-1">昨天SHOW<br/>(ICB)</span>
-                            </div>
-                        </div>
-                    </div>
+                        )}
 
-                    {/* 3rd Section (Dark Blue Box) */}
-                    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.667rem)] xl:w-[calc(20%-0.8rem)] bg-blue-800 rounded-xl p-3 flex flex-col shadow-lg h-full transition-transform hover:-translate-y-1">
-                        <h3 className="flex items-center justify-center gap-1.5 font-bold text-lg mb-2 border-b border-blue-600 pb-1 tracking-wide text-white">
-                            <Share2 className="w-5 h-5 text-blue-200" />
-                            200分發點
-                        </h3>
-                        
-                        <div className="flex flex-col items-center bg-white/70 rounded-lg py-2 mb-2 shadow-sm">
-                            <span className="text-4xl font-extrabold text-gray-800">{summaryData.totalNodes.toLocaleString()}</span>
-                            <span className="text-xs text-gray-700 mt-1 uppercase tracking-wider font-bold">分發點總數</span>
-                        </div>
-                        
-                        <div className="flex justify-between items-stretch gap-2 mt-auto">
-                            <div className="bg-white/70 border border-white/50 rounded-lg p-2 flex-1 flex flex-col justify-center items-center text-center shadow-inner">
-                                <span className="text-xl font-extrabold text-gray-800">{summaryData.nodeDelta > 0 ? `+${summaryData.nodeDelta}` : summaryData.nodeDelta}</span>
-                                <span className="text-xs text-gray-700 font-bold uppercase mt-1 leading-tight">3天增加</span>
-                            </div>
-                            <div className="bg-white/70 border border-white/50 rounded-lg p-2 flex-1 flex flex-col justify-center items-center text-center shadow-inner">
-                                <span className="text-xl font-extrabold text-gray-800">
-                                    {selectedTherapist === 'All' ? '無此數' : `${summaryData.mauPercent.toFixed(2)}%`}
-                                </span>
-                                <span className="text-xs text-gray-700 font-bold uppercase mt-1 leading-tight">MAU %</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 4th Section (Green Box) - High PEXO */}
-                    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.667rem)] xl:w-[calc(20%-0.8rem)] bg-[#4caf50] rounded-xl p-3 flex flex-col shadow-lg h-full transition-transform hover:-translate-y-1">
-                        <h3 className="flex items-center justify-center gap-1.5 font-bold text-lg mb-2 border-b border-[#3d8c40] pb-1 tracking-wide text-white">
-                            <TrendingUp className="w-5 h-5 text-green-200" />
-                            High PEXO
-                        </h3>
-                        
-                        <div className="grid grid-cols-2 gap-2 mb-2">
-                            <div className="flex flex-col items-center bg-white/70 rounded-lg py-2 shadow-sm">
-                                <div className="text-3xl font-extrabold flex items-baseline text-gray-800">
-                                    {summaryData.trialTodayMain.toLocaleString()} 
-                                    <span className="text-base text-gray-600 ml-1 font-bold">({summaryData.trialTodayBracket})</span>
+                        {/* Filters and Controls */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-6 p-4">
+                            <div className="flex flex-col xl:flex-row gap-4 justify-between items-start xl:items-center">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 w-full xl:w-auto flex-1">
+                                    <div className="relative">
+                                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                                        <input
+                                            type="text"
+                                            placeholder="Search anything..."
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            className="w-full pl-9 pr-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white transition-all"
+                                        />
+                                    </div>
+                                    <select
+                                        value={selectedBrand}
+                                        onChange={(e) => setSelectedBrand(e.target.value)}
+                                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                                    >
+                                        <option value="All">All Brands</option>
+                                        {brands.filter(b => b !== 'All').map(brand => (
+                                            <option key={brand} value={brand}>{brand}</option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={selectedCenter}
+                                        onChange={(e) => setSelectedCenter(e.target.value)}
+                                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                                    >
+                                        <option value="All">All Centers</option>
+                                        {centers.filter(c => c !== 'All').map(center => (
+                                            <option key={center} value={center}>{center}</option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={selectedTherapist}
+                                        onChange={(e) => setSelectedTherapist(e.target.value)}
+                                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                                    >
+                                        <option value="All">All Therapists</option>
+                                        {therapists.filter(t => t !== 'All').map(therapist => (
+                                            <option key={therapist} value={therapist}>{therapist}</option>
+                                        ))}
+                                    </select>
+                                    <select
+                                        value={selectedBS}
+                                        onChange={(e) => setSelectedBS(e.target.value)}
+                                        className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:bg-white"
+                                    >
+                                        <option value="All">All BS</option>
+                                        {bsList.filter(b => b !== 'All').map(bs => (
+                                            <option key={bs} value={bs}>{bs}</option>
+                                        ))}
+                                    </select>
                                 </div>
-                                <span className="text-[10px] text-gray-700 mt-1 uppercase tracking-wider font-extrabold">體驗療程開單(今天)</span>
-                            </div>
-                            
-                            <div className="flex flex-col items-center bg-white/70 rounded-lg py-2 shadow-sm">
-                                <div className="text-3xl font-extrabold flex items-baseline text-gray-800">
-                                    {summaryData.packageTodayMain.toLocaleString()} 
-                                    <span className="text-base text-gray-600 ml-1 font-bold">({summaryData.packageTodayBracket})</span>
+                                <div className="flex items-center gap-3 w-full xl:w-auto">
+                                    <button 
+                                        onClick={generateInsights}
+                                        className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 border border-purple-200 rounded-lg text-sm font-medium hover:bg-purple-100 transition-colors"
+                                    >
+                                        <Sparkles className="w-4 h-4" /> AI Insights
+                                    </button>
+                                    <button 
+                                        onClick={exportToCSV}
+                                        className="flex-1 xl:flex-none flex items-center justify-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg text-sm font-medium hover:bg-emerald-100 transition-colors"
+                                    >
+                                        <Download className="w-4 h-4" /> Export CSV
+                                    </button>
                                 </div>
-                                <span className="text-[10px] text-gray-700 mt-1 uppercase tracking-wider font-extrabold">套餐 (Package)開單(今天)</span>
                             </div>
                         </div>
-                        
-                        <div className="flex justify-center mt-auto">
-                            <div className="bg-white/70 border border-white/50 rounded-lg p-1.5 w-full flex flex-col justify-center items-center text-center shadow-inner">
-                                <span className="text-xl font-extrabold text-gray-800">
-                                    {selectedTherapist === 'All' ? '無此數' : `${summaryData.penetrationRate.toFixed(2)}%`}
-                                </span>
-                                <span className="text-[10px] text-gray-700 font-extrabold uppercase mt-1 leading-tight">滲透率%</span>
-                            </div>
-                        </div>
-                    </div>
 
-                    {/* 5th Section (Yellow Box) - 龍尾 */}
-                    <div className="w-full sm:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.667rem)] xl:w-[calc(20%-0.8rem)] bg-yellow-500 rounded-xl p-3 flex flex-col shadow-lg h-full transition-transform hover:-translate-y-1">
-                        <h3 className="flex items-center justify-center gap-1.5 font-bold text-lg mb-2 border-b border-yellow-600 pb-1 tracking-wide text-white">
-                            <Gift className="w-5 h-5 text-yellow-100" />
-                            龍尾
-                        </h3>
-                        
-                        <div className="grid grid-cols-2 gap-2 h-full">
-                            <div className="flex flex-col items-center bg-white/80 rounded-lg py-4 px-2 shadow-sm text-center justify-center">
-                                <div className="text-3xl font-extrabold flex items-baseline text-gray-800">
-                                    {summaryData.bdayBook.toLocaleString()} 
-                                    <span className="text-base text-gray-600 ml-1 font-bold">
-                                        ({summaryData.bdayDelta > 0 ? `+${summaryData.bdayDelta}` : summaryData.bdayDelta})
-                                    </span>
-                                </div>
-                                <span className="text-[10px] text-gray-700 mt-2 uppercase tracking-wider font-extrabold leading-tight">生日 Giftcard Book<br/>(三天增加)</span>
-                            </div>
-                            
-                            <div className="flex flex-col items-center bg-white/80 rounded-lg py-4 px-2 shadow-sm text-center justify-center">
-                                <div className="text-3xl font-extrabold flex items-baseline text-gray-800">
-                                    {summaryData.plasmaBook.toLocaleString()} 
-                                    <span className="text-base text-gray-600 ml-1 font-bold">
-                                        ({summaryData.plasmaDelta > 0 ? `+${summaryData.plasmaDelta}` : summaryData.plasmaDelta})
-                                    </span>
-                                </div>
-                                <span className="text-[10px] text-gray-700 mt-2 uppercase tracking-wider font-extrabold leading-tight">Plasma Giftcard Book<br/>(三天增加)</span>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
-
-                {/* --- TABLE SEPARATION AND TITLE --- */}
-                <div className="mt-10 mb-4">
-                    <hr className="border-t-2 border-gray-200 mb-6" />
-                    <div className="flex justify-between items-center px-2">
-                        <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                            <TableIcon className="w-5 h-5 text-green-600" />
-                            詳細數據表
-                        </h2>
-                        <button 
-                            onClick={exportToCSV}
-                            className="flex items-center gap-1.5 px-4 py-2 bg-green-50 text-green-700 font-semibold rounded-lg hover:bg-green-100 transition-colors text-sm border border-green-200 shadow-sm"
-                        >
-                            <Download className="w-4 h-4" />
-                            匯出 CSV
-                        </button>
-                    </div>
-                </div>
-
-                {/* --- DATA TABLE --- */}
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="overflow-x-auto max-h-[75vh]">
-                        <table className="w-full text-sm text-left whitespace-nowrap border-collapse">
-                            <thead className="text-xs text-gray-700 bg-gray-50 sticky top-0 z-40 shadow-sm">
-                                {/* Multi-level Super Headers */}
-                                <tr>
-                                    <th className="bg-white border-b border-gray-200 border-r sticky left-0 z-40 min-w-[60px] max-w-[60px] w-[60px]"></th>
-                                    <th className="bg-white border-b border-gray-200 border-r sticky left-[60px] z-40 min-w-[90px] max-w-[90px] w-[90px]"></th>
-                                    <th className="bg-white border-b border-gray-200 border-r sticky left-[150px] z-40 min-w-[85px] max-w-[85px] w-[85px]"></th>
-                                    <th className="bg-white border-b border-gray-200 border-r sticky left-[235px] z-40 min-w-[85px] max-w-[85px] w-[85px] shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)]"></th>
-                                    
-                                    <th colSpan="2" className="bg-cyan-600 text-white text-center font-bold py-1.5 border-r border-cyan-700 text-[11px] tracking-wide">
-                                        CB
-                                    </th>
-
-                                    <th colSpan="5" className="bg-purple-600 text-white text-center font-bold py-1.5 border-r border-purple-700 text-[11px] tracking-wide">
-                                        200% Purple Light
-                                    </th>
-
-                                    <th colSpan="3" className="bg-orange-500 text-white text-center font-bold py-1.5 border-r border-orange-600 text-[11px] tracking-wide">
-                                        862+ICB
-                                    </th>
-                                    
-                                    <th colSpan="3" className="bg-blue-800 text-white text-center font-bold py-1.5 border-r border-blue-900 text-[11px] tracking-wide">
-                                        200 Nodes
-                                    </th>
-                                    
-                                    <th colSpan="5" className="bg-[#4caf50] text-white text-center font-bold py-1.5 border-r border-green-700 text-[11px] tracking-wide">
-                                        High Pexo PT/Head
-                                    </th>
-
-                                    <th colSpan="4" className="bg-yellow-600 text-white text-center font-bold py-1.5 border-r border-yellow-700 text-[11px] tracking-wide">
-                                        龍尾
-                                    </th>
-
-                                    <th colSpan="6" className="bg-fuchsia-700 text-white text-center font-bold py-1.5 text-[11px] tracking-wide">
-                                        直播激活
-                                    </th>
-                                </tr>
-                                
-                                {/* Sortable KPI Headers */}
-                                <tr>
-                                    {/* Sortable Main Hierarchy Headers (FROZEN/STICKY) */}
-                                    <th className={`px-1 py-1.5 font-bold hover:bg-gray-200 transition-colors border-b border-r border-gray-200 align-top min-w-[60px] max-w-[60px] w-[60px] sticky left-0 z-40 ${sortConfig.key === 'Brand' ? 'bg-gray-300 shadow-inner' : 'bg-gray-50'}`}>
-                                        <div className="flex items-center gap-0.5 cursor-pointer mb-1 text-[10px] justify-between" onClick={() => requestSort('Brand')}>
-                                            <span className="truncate">品牌</span>
-                                            {sortConfig.key === 'Brand' ? (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-black" /> : <ChevronDown className="w-4 h-4 flex-shrink-0 text-black" />) : <ChevronDown className="w-3 h-3 opacity-20 flex-shrink-0" />}
-                                        </div>
-                                        <select 
-                                            className="w-full text-[9px] font-normal border border-gray-300 rounded text-gray-700 bg-white py-0.5 px-0.5 focus:outline-none focus:ring-1 focus:ring-green-500 mt-0.5 shadow-sm"
-                                            value={selectedBrand}
-                                            onChange={(e) => { setSelectedBrand(e.target.value); setSelectedCenter('All'); setSelectedTherapist('All'); }}
-                                        >
-                                            {brands.map(b => <option key={b} value={b}>{b === 'All' ? '全部' : b}</option>)}
-                                        </select>
-                                    </th>
-                                    <th className={`px-1 py-1.5 font-bold hover:bg-gray-200 transition-colors border-b border-r border-gray-200 align-top min-w-[90px] max-w-[90px] w-[90px] sticky left-[60px] z-40 ${sortConfig.key === 'Center' ? 'bg-gray-300 shadow-inner' : 'bg-gray-50'}`}>
-                                        <div className="flex items-center gap-0.5 cursor-pointer mb-1 text-[10px] justify-between" onClick={() => requestSort('Center')}>
-                                            <span className="truncate">樓層</span>
-                                            {sortConfig.key === 'Center' ? (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-black" /> : <ChevronDown className="w-4 h-4 flex-shrink-0 text-black" />) : <ChevronDown className="w-3 h-3 opacity-20 flex-shrink-0" />}
-                                        </div>
-                                        <select 
-                                            className="w-full text-[9px] font-normal border border-gray-300 rounded text-gray-700 bg-white py-0.5 px-0.5 focus:outline-none focus:ring-1 focus:ring-green-500 mt-0.5 shadow-sm"
-                                            value={selectedCenter}
-                                            onChange={(e) => { setSelectedCenter(e.target.value); setSelectedTherapist('All'); setSelectedBS('All'); }}
-                                        >
-                                            {centers.map(c => <option key={c} value={c}>{c === 'All' ? '全部' : c}</option>)}
-                                        </select>
-                                    </th>
-                                    <th className={`px-1 py-1.5 font-bold hover:bg-gray-200 transition-colors border-b border-r border-gray-200 align-top min-w-[85px] max-w-[85px] w-[85px] sticky left-[150px] z-40 ${sortConfig.key === 'Therapist' ? 'bg-gray-300 shadow-inner' : 'bg-gray-50'}`}>
-                                        <div className="flex items-center gap-0.5 cursor-pointer mb-1 text-[10px] justify-between" onClick={() => requestSort('Therapist')}>
-                                            <span className="truncate">治療師</span>
-                                            {sortConfig.key === 'Therapist' ? (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-black" /> : <ChevronDown className="w-4 h-4 flex-shrink-0 text-black" />) : <ChevronDown className="w-3 h-3 opacity-20 flex-shrink-0" />}
-                                        </div>
-                                        <select 
-                                            className="w-full text-[9px] font-normal border border-gray-300 rounded text-gray-700 bg-white py-0.5 px-0.5 focus:outline-none focus:ring-1 focus:ring-green-500 mt-0.5 shadow-sm"
-                                            value={selectedTherapist}
-                                            onChange={(e) => { setSelectedTherapist(e.target.value); setSelectedBS('All'); }}
-                                        >
-                                            {therapists.map(t => <option key={t} value={t}>{t === 'All' ? '全部' : t}</option>)}
-                                        </select>
-                                    </th>
-                                    <th className={`px-1 py-1.5 font-bold hover:bg-gray-200 transition-colors border-b border-r border-gray-200 align-top min-w-[85px] max-w-[85px] w-[85px] sticky left-[235px] z-40 shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)] ${sortConfig.key === 'BS' ? 'bg-gray-300 shadow-inner' : 'bg-gray-50'}`}>
-                                        <div className="flex items-center gap-0.5 cursor-pointer mb-1 text-[10px] justify-between" onClick={() => requestSort('BS')}>
-                                            <span className="truncate">BS</span>
-                                            {sortConfig.key === 'BS' ? (sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-black" /> : <ChevronDown className="w-4 h-4 flex-shrink-0 text-black" />) : <ChevronDown className="w-3 h-3 opacity-20 flex-shrink-0" />}
-                                        </div>
-                                        <select 
-                                            className="w-full text-[9px] font-normal border border-gray-300 rounded text-gray-700 bg-white py-0.5 px-0.5 focus:outline-none focus:ring-1 focus:ring-green-500 mt-0.5 shadow-sm"
-                                            value={selectedBS}
-                                            onChange={(e) => setSelectedBS(e.target.value)}
-                                        >
-                                            {bsList.map(b => <option key={b} value={b}>{b === 'All' ? '全部' : b}</option>)}
-                                        </select>
-                                    </th>
-                                    
-                                    {/* Sortable Custom KPI Headers mapping their specific background classes */}
-                                    {activeKPIs.map(kpi => (
-                                        <th key={kpi.id} onClick={() => requestSort(kpi.id)} className={`px-1 py-2 font-bold cursor-pointer hover:opacity-80 transition-all border-b border-r border-black/5 text-center group align-top min-w-[70px] text-[10px] ${kpi.headerClass} ${sortConfig.key === kpi.id ? 'brightness-90 shadow-inner border-b-2 border-b-black/30' : ''}`}>
-                                            <div className="flex items-center justify-center gap-0.5 h-full">
-                                                <span className="whitespace-normal break-words leading-tight" title={kpi.displayName}>{kpi.displayName}</span>
-                                                {sortConfig.key === kpi.id ? (
-                                                    sortConfig.direction === 'asc' ? <ChevronUp className="w-4 h-4 flex-shrink-0 text-black opacity-70" /> : <ChevronDown className="w-4 h-4 flex-shrink-0 text-black opacity-70" />
-                                                ) : <ChevronDown className="w-3 h-3 opacity-0 group-hover:opacity-40 flex-shrink-0" />}
-                                            </div>
-                                        </th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            
-                            <tbody className="divide-y divide-gray-100 relative z-0">
-                                {processedData.length > 0 ? (
-                                    processedData.map((row) => (
-                                        <tr key={row.id} className="hover:bg-gray-50 transition-colors group">
-                                            {/* Frozen Cells in Body */}
-                                            <td className="px-1.5 py-1.5 font-semibold text-[11px] text-gray-800 border-r border-gray-200 bg-white group-hover:bg-gray-50 sticky left-0 z-20 min-w-[60px] max-w-[60px] w-[60px] truncate" title={row.Brand}>{row.Brand}</td>
-                                            <td className="px-1.5 py-1.5 font-semibold text-[11px] text-gray-800 border-r border-gray-200 bg-white group-hover:bg-gray-50 sticky left-[60px] z-20 min-w-[90px] max-w-[90px] w-[90px] truncate" title={row.Center}>{row.Center}</td>
-                                            <td className="px-1.5 py-1.5 text-[11px] text-gray-600 border-r border-gray-200 bg-white group-hover:bg-gray-50 sticky left-[150px] z-20 min-w-[85px] max-w-[85px] w-[85px] truncate" title={row.Therapist}>{row.Therapist}</td>
-                                            <td className="px-1.5 py-1.5 text-[11px] text-gray-600 border-r border-gray-200 bg-white group-hover:bg-gray-50 sticky left-[235px] z-20 min-w-[85px] max-w-[85px] w-[85px] truncate shadow-[4px_0_8px_-2px_rgba(0,0,0,0.1)]" title={row.BS}>{row.BS}</td>
-                                            
-                                            {/* Data Cells */}
-                                            {activeKPIs.map(kpi => {
-                                                const condFormat = getConditionalFormat(kpi.name, row[kpi.id], mtdTargetRatio, colRanges);
-                                                return (
-                                                    <td key={kpi.id} 
-                                                        className={`px-1.5 py-1.5 text-center font-bold text-[11px] border-r border-gray-50/50 ${condFormat.className}`}
-                                                        style={condFormat.style}
-                                                    >
-                                                        {formatDisplayValue(row[kpi.id], kpi.format)}
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
-                                    ))
+                        {/* Data Table */}
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="overflow-x-auto" style={{ maxHeight: 'calc(100vh - 350px)' }}>
+                                {loading && processedData.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center py-20">
+                                        <RefreshCw className="w-8 h-8 text-indigo-500 animate-spin mb-4" />
+                                        <p className="text-gray-500 font-medium">Loading live data...</p>
+                                    </div>
                                 ) : (
-                                    <tr>
-                                        <td colSpan={100} className="px-6 py-12 text-center text-gray-500 font-medium bg-gray-50 text-xs">
-                                            找不到符合篩選條件的資料。
-                                        </td>
-                                    </tr>
+                                    <table className="w-full text-sm text-left whitespace-nowrap">
+                                        <thead className="text-xs uppercase bg-gray-100 sticky top-0 z-20 shadow-sm">
+                                            <tr>
+                                                <th 
+                                                    className="px-4 py-4 text-gray-700 cursor-pointer hover:bg-gray-200 sticky left-0 z-30 bg-gray-100 font-semibold"
+                                                    onClick={() => handleSort('Brand')}
+                                                >
+                                                    <div className="flex items-center gap-1">Brand {sortConfig.key === 'Brand' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>)}</div>
+                                                </th>
+                                                <th 
+                                                    className="px-4 py-4 text-gray-700 cursor-pointer hover:bg-gray-200 sticky left-[100px] sm:left-[120px] z-30 bg-gray-100 border-r font-semibold"
+                                                    onClick={() => handleSort('Center')}
+                                                >
+                                                    <div className="flex items-center gap-1">Center {sortConfig.key === 'Center' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>)}</div>
+                                                </th>
+                                                <th className="px-4 py-4 text-gray-700 cursor-pointer hover:bg-gray-200 font-semibold" onClick={() => handleSort('Therapist')}>
+                                                    <div className="flex items-center gap-1">Therapist {sortConfig.key === 'Therapist' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>)}</div>
+                                                </th>
+                                                <th className="px-4 py-4 text-gray-700 cursor-pointer hover:bg-gray-200 border-r font-semibold" onClick={() => handleSort('BS')}>
+                                                    <div className="flex items-center gap-1">BS {sortConfig.key === 'BS' && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>)}</div>
+                                                </th>
+
+                                                {/* Dynamic KPIs Headers */}
+                                                {activeKPIs.map(kpi => (
+                                                    <th 
+                                                        key={kpi.id} 
+                                                        className={`px-3 py-4 cursor-pointer hover:opacity-90 font-semibold ${kpi.headerClass}`}
+                                                        onClick={() => handleSort(kpi.id)}
+                                                    >
+                                                        <div className="flex items-center gap-1 justify-end">
+                                                            {kpi.displayName}
+                                                            {sortConfig.key === kpi.id && (sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3"/> : <ChevronDown className="w-3 h-3"/>)}
+                                                        </div>
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {processedData.length > 0 ? (
+                                                processedData.map((row, index) => (
+                                                    <tr key={row.id} className={`hover:bg-indigo-50/50 transition-colors ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}>
+                                                        <td className="px-4 py-3 font-medium text-gray-900 sticky left-0 z-10 bg-inherit border-r border-gray-100">
+                                                            {row.Brand}
+                                                        </td>
+                                                        <td className="px-4 py-3 sticky left-[100px] sm:left-[120px] z-10 bg-inherit border-r border-gray-200">
+                                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                                {row.Center}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-gray-600">
+                                                            <div className="flex items-center justify-between gap-2">
+                                                                <span>{row.Therapist}</span>
+                                                                {row.Therapist && row.Therapist !== 'Unknown' && (
+                                                                    <button 
+                                                                        onClick={() => getTherapistCoaching(row)}
+                                                                        className="p-1 hover:bg-purple-100 rounded text-purple-600 transition-colors"
+                                                                        title="Get AI Coaching Tips"
+                                                                    >
+                                                                        ✨
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-gray-600 border-r border-gray-200">{row.BS}</td>
+                                                        
+                                                        {activeKPIs.map(kpi => {
+                                                            const val = row[kpi.id];
+                                                            const { className: condClass, style } = getConditionalFormat(kpi.name, val, mtdTargetRatio, colRanges);
+                                                            return (
+                                                                <td 
+                                                                    key={kpi.id} 
+                                                                    className={`px-3 py-3 text-right tabular-nums ${condClass}`} 
+                                                                    style={style}
+                                                                >
+                                                                    {formatValue(val, kpi.format)}
+                                                                </td>
+                                                            );
+                                                        })}
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan={4 + activeKPIs.length} className="px-4 py-12 text-center text-gray-500">
+                                                        <FilterIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+                                                        <p className="text-lg font-medium text-gray-900">No matching records found</p>
+                                                        <p className="text-sm mt-1">Try adjusting your filters or search term.</p>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 )}
-                            </tbody>
-                        </table>
-                    </div>
-                    <div className="p-3 border-t border-gray-200 bg-gray-50 text-[11px] text-gray-500 text-right font-medium">
-                        顯示 {processedData.length} 筆資料。
-                    </div>
-                </div>
+                            </div>
+                            <div className="bg-gray-50 px-4 py-3 border-t border-gray-200 text-sm text-gray-500 flex justify-between items-center">
+                                <span>Showing <strong>{processedData.length}</strong> records</span>
+                            </div>
+                        </div>
+
+                        {/* AI Insights Modal */}
+                        {isInsightModalOpen && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+                                <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-purple-50 to-white">
+                                        <div className="flex items-center gap-2 text-purple-800 font-semibold text-lg">
+                                            <Sparkles className="w-5 h-5 text-purple-600" />
+                                            Campaign AI Insights
+                                        </div>
+                                        <button onClick={() => setIsInsightModalOpen(false)} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition-colors">
+                                            <XIcon className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                    <div className="p-6 overflow-y-auto">
+                                        {insightLoading ? (
+                                            <div className="flex flex-col items-center justify-center py-12 text-purple-600">
+                                                <RefreshCw className="w-8 h-8 animate-spin mb-4" />
+                                                <p className="font-medium animate-pulse">Analyzing dashboard data...</p>
+                                            </div>
+                                        ) : (
+                                            <div className="prose prose-purple prose-sm max-w-none whitespace-pre-wrap text-gray-700 leading-relaxed">
+                                                {insightText}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+                                        <button onClick={() => setIsInsightModalOpen(false)} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm transition-colors">
+                                            Close
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* AI Coaching Modal */}
+                        {coachingData.open && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+                                <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                                    <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-indigo-50 to-white">
+                                        <div className="flex items-center gap-2 text-indigo-800 font-semibold text-lg">
+                                            <Sparkles className="w-5 h-5 text-indigo-600" />
+                                            AI Coach: {coachingData.therapist}
+                                        </div>
+                                        <button onClick={() => setCoachingData(prev => ({ ...prev, open: false }))} className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1 rounded-lg transition-colors">
+                                            <XIcon className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                    <div className="p-6 min-h-[150px] flex flex-col justify-center">
+                                        {coachingData.loading ? (
+                                            <div className="flex flex-col items-center justify-center text-indigo-600 py-4">
+                                                <RefreshCw className="w-6 h-6 animate-spin mb-3" />
+                                                <p className="text-sm font-medium animate-pulse">Generating personalized advice...</p>
+                                            </div>
+                                        ) : (
+                                            <div className="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">
+                                                {coachingData.text}
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+                                        <button onClick={() => setCoachingData(prev => ({ ...prev, open: false }))} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium text-sm transition-colors shadow-sm">
+                                            Got it
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                    </main>
                 </div>
             );
         }
