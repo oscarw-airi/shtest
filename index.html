@@ -89,7 +89,8 @@
             return `${y}年${m}月${d}日 ${timeStr}`;
         };
 
-        const getConditionalFormat = (colName, val, targetRatio, ranges) => {
+        // Fix: Added the 'row' parameter to the function signature
+        const getConditionalFormat = (colName, val, targetRatio, ranges, row = null) => {
             const num = parseFloat(val);
             if (isNaN(num)) return { className: 'text-gray-800' };
 
@@ -117,10 +118,20 @@
                 else className += 'bg-red-200';
             }
             else if (colName === 'MTD%') {
-                if (targetRatio && num > (targetRatio * 100)) className += 'bg-purple-300 font-bold';
-                else if (num >= 100) className += 'bg-green-200';
-                else if (num >= 90) className += 'bg-yellow-200';
-                else className += 'bg-red-200';
+                const target = row ? (row.targetMonth || 0) : 0;
+                const sales = row ? (row.totalSalesMonth || 0) : 0;
+                
+                if (target > 0 && sales >= target) {
+                    className += 'bg-blue-200 text-blue-900 font-bold';
+                } else if (num >= 100) {
+                    className += 'bg-green-200 text-green-900 font-medium';
+                } else if (targetRatio && num > (targetRatio * 100)) {
+                    className += 'bg-purple-300 font-bold';
+                } else if (num >= 90) {
+                    className += 'bg-yellow-200';
+                } else {
+                    className += 'bg-red-200';
+                }
             }
             else if (['RSVP(ACB)', 'RSVP(ICB)', 'View', 'Book(ACB)', 'Book(ICB)', 'Show', 'Sign'].includes(colName)) {
                 if (num > 0) className += 'bg-green-200';
@@ -811,7 +822,8 @@
                                                         
                                                         {activeKPIs.map(kpi => {
                                                             const val = row[kpi.id];
-                                                            const { className: condClass, style } = getConditionalFormat(kpi.name, val, mtdTargetRatio, colRanges);
+                                                            // 傳遞包含該列其他指標的 `row` 以供互相比較 (例如 totalSalesMonth vs targetMonth)
+                                                            const { className: condClass, style } = getConditionalFormat(kpi.name, val, mtdTargetRatio, colRanges, row);
                                                             return (
                                                                 <td 
                                                                     key={kpi.id} 
