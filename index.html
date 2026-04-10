@@ -262,8 +262,9 @@
                     setLoading(true);
                     const sheetId = GOOGLE_SHEET_ID;
                     
+                    // 💡 UPDATE: Expanded range to A:AM to safely encompass all newly added columns (like View)
                     const urls = [
-                        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=583294442&range=A:AG`
+                        `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&gid=583294442&range=A:AM`
                     ];
 
                     const [realTimeRes] = await Promise.all(
@@ -340,13 +341,14 @@
                         plasmaBook: getDynamicIndex(extractedHeaders, ['Plasma Giftcard Book', 'PlasmaGiftcard Book'], 25),
                         plasmaDelta: getDynamicIndex(extractedHeaders, ['Plasma Giftcard 三天增加', 'PlasmaGiftcard三天增加'], 26),
 
-                        liveAB: getDynamicIndex(extractedHeaders, ['RSVP(ACB)', 'rsvp(acb)', 'RSVP (ACB)', 'RSVP', 'rsvp'], 27), 
-                        liveAC: getDynamicIndex(extractedHeaders, ['RSVP(ICB)', 'rsvp(icb)', 'RSVP (ICB)', 'Book', 'book'], 28), 
-                        liveView: getDynamicIndex(extractedHeaders, ['View', 'view', '觀看'], 33),
-                        liveAD: getDynamicIndex(extractedHeaders, ['Book(ACB)', 'book(acb)', 'Book (ACB)', 'Show', 'show'], 29), 
-                        liveAE: getDynamicIndex(extractedHeaders, ['Book(ICB)', 'book(icb)', 'Book (ICB)', 'Sign', 'sign'], 30),
-                        liveAF: getDynamicIndex(extractedHeaders, ['Show', 'show', 'Live AF', 'af'], 31),
-                        liveAG: getDynamicIndex(extractedHeaders, ['Sign', 'sign', 'Live AG', 'ag'], 32)
+                        // 💡 UPDATE: Cleaned up search terms to strictly match Google Sheet headers and prevent incorrect fallback matching
+                        liveAB: getDynamicIndex(extractedHeaders, ['RSVP(ACB)', 'rsvp(acb)', 'RSVP (ACB)'], 27), 
+                        liveAC: getDynamicIndex(extractedHeaders, ['RSVP(ICB)', 'rsvp(icb)', 'RSVP (ICB)'], 28), 
+                        liveView: getDynamicIndex(extractedHeaders, ['View', 'view', '觀看'], 29),
+                        liveAD: getDynamicIndex(extractedHeaders, ['Book(ACB)', 'book(acb)', 'Book (ACB)'], 30), 
+                        liveAE: getDynamicIndex(extractedHeaders, ['Book(ICB)', 'book(icb)', 'Book (ICB)'], 31),
+                        liveAF: getDynamicIndex(extractedHeaders, ['Show', 'show'], 32),
+                        liveAG: getDynamicIndex(extractedHeaders, ['Sign', 'sign'], 33)
                     };
                     setColMap(mappedIndices);
 
