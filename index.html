@@ -122,6 +122,9 @@
                 else if (num >= 90) className += 'bg-yellow-200';
                 else className += 'bg-red-200';
             }
+            else if (['RSVP(ACB)', 'RSVP(ICB)', 'View', 'Book(ACB)', 'Book(ICB)', 'Show', 'Sign'].includes(colName)) {
+                if (num > 0) className += 'bg-green-200';
+            }
             else if (['今天 Full course', '體驗療程開單 (今天)', 'MAU %', '滲透率%'].includes(colName)) {
                 const range = ranges[colName];
                 if (range && range.max > range.min) {
@@ -159,6 +162,7 @@
             if (val === null || val === undefined) return '-';
             if (formatType === 'currency') return formatShortCurrency(val);
             if (formatType === 'percent') return (val * 100).toFixed(1) + '%';
+            if (formatType === 'percent-raw') return val.toFixed(1) + '%'; // Added raw percent format without *100
             if (formatType === 'number') return val.toLocaleString();
             return val;
         };
@@ -397,7 +401,7 @@
 
                     { id: 'targetMonth', index: colMap.targetMonth, name: '本月目標$$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
                     { id: 'totalSalesMonth', index: colMap.totalSalesMonth, name: '本月總業績$$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
-                    { id: 'mtdPercent', index: colMap.mtdPercent, name: 'MTD%', format: 'percent', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
+                    { id: 'mtdPercent', index: colMap.mtdPercent, name: 'MTD%', format: 'percent-raw', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
                     { id: 'turnLightMissing', index: colMap.turnLightMissing, name: '轉燈尚欠$$', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
                     { id: 'todaySales', index: colMap.todaySales, name: '今日銷售額', format: 'currency', headerClass: 'bg-purple-100 text-purple-900 border-t border-purple-200' },
 
@@ -406,14 +410,14 @@
                     { id: 'yesterdayShowICB', index: colMap.yesterdayShowICB, name: '昨天SHOW (ICB)', format: 'number', headerClass: 'bg-orange-100 text-orange-900 border-t border-orange-200' },
 
                     { id: 'node', index: colMap.node, name: '分發點總數', format: 'number', headerClass: 'bg-blue-100 text-blue-900 border-t border-blue-200' },
-                    { id: 'mauPercent', index: colMap.mauPercent, name: 'MAU %', format: 'percent', headerClass: 'bg-blue-100 text-blue-900 border-t border-blue-200' },
+                    { id: 'mauPercent', index: colMap.mauPercent, name: 'MAU %', format: 'percent-raw', headerClass: 'bg-blue-100 text-blue-900 border-t border-blue-200' }, // Updated format here
                     { id: 'node3Days', index: colMap.node3Days, name: '3天增加', format: 'number', headerClass: 'bg-blue-100 text-blue-900 border-t border-blue-200' },
                     
                     { id: 'trialTodayMain', index: colMap.trialTodayMain, name: '體驗療程開單(今天)', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
                     { id: 'trialTodayBracket', index: colMap.trialTodayBracket, name: '今天 PT QTY', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
                     { id: 'packageTodayMain', index: colMap.packageTodayMain, name: '套餐 (Package)開單(今天)', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
                     { id: 'packageTodayBracket', index: colMap.packageTodayBracket, name: '今天 Full course', format: 'number', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
-                    { id: 'penetrationRate', index: colMap.penetrationRate, name: '滲透率%', format: 'percent', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
+                    { id: 'penetrationRate', index: colMap.penetrationRate, name: '滲透率%', format: 'percent-raw', headerClass: 'bg-green-100 text-green-900 border-t border-green-200' },
                     
                     { id: 'bdayBook', index: colMap.bdayBook, name: '生日 Giftcard Book', format: 'number', headerClass: 'bg-yellow-100 text-yellow-900 border-t border-yellow-200' },
                     { id: 'bdayDelta', index: colMap.bdayDelta, name: '生日 Giftcard 三天增加', format: 'number', headerClass: 'bg-yellow-100 text-yellow-900 border-t border-yellow-200' },
